@@ -32,6 +32,7 @@
             transition: background-color 0.5s ease, color 0.5s ease, font-family 0.3s ease;
             text-align: center;
             overflow: hidden;
+            /* user-select: none is kept for the body, but overridden for editable elements below */
             user-select: none;
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
@@ -83,6 +84,11 @@
             text-shadow: 0 2px 4px rgba(0,0,0,0.3);
             font-family: inherit;
             white-space: nowrap;
+            
+            /* FIX FOR MOBILE EDITING */
+            user-select: text;
+            -webkit-user-select: text;
+            pointer-events: auto;
         }
 
         h1.solo-mode { font-size: 15vw; display: block; }
@@ -93,7 +99,7 @@
         .timer-display {
             font-weight: bold;
             font-variant-numeric: tabular-nums; 
-            cursor: pointer;
+            cursor: text; /* Changed from pointer to text to imply editing */
             line-height: 1;
             outline: none;
             border-bottom: 2px solid transparent;
@@ -103,6 +109,11 @@
             font-family: inherit;
             white-space: nowrap; 
             
+            /* FIX FOR MOBILE EDITING */
+            user-select: text;
+            -webkit-user-select: text;
+            pointer-events: auto;
+
             /* Standard Size (05:00) */
             font-size: 22vw; 
         }
@@ -293,8 +304,8 @@
 
     <div class="container">
         <div id="scrambleDisplay" class="scramble-display"></div>
-        <h1 id="mainTitle" contenteditable="true">My Message</h1>
-        <div class="timer-display" id="timer">05:00</div>
+        <h1 id="mainTitle" contenteditable="true" spellcheck="false">My Message</h1>
+        <div class="timer-display" id="timer" contenteditable="true" spellcheck="false">05:00</div>
     </div>
 
     <div id="settingsPanel" class="settings-panel hidden">
@@ -695,9 +706,19 @@
         function toggleMsVisibility() { updateLayout(); updateDisplay(); playClick(); }
 
         const handleInputDown = (e) => {
+            // Check if we are interacting with editable elements (Timer or Title)
+            const isEditable = e.target.id === 'timer' || e.target.id === 'mainTitle';
+            
+            // Standard controls check
             const isControl = e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('.controls') || e.target.closest('.settings-panel') || e.target.tagName === 'SELECT' || e.target.closest('.toggle-row');
-            if (document.body.classList.contains('fullscreen-mode') && !isControl && !isRunning) document.body.classList.toggle('show-controls');
-            if (!isCuberMode || isControl) return;
+            
+            // Fullscreen check logic
+            if (document.body.classList.contains('fullscreen-mode') && !isControl && !isRunning && !isEditable) document.body.classList.toggle('show-controls');
+            
+            // If we are editing, or clicking controls, or NOT in Cuber Mode, let the default behavior happen (keyboard pop up)
+            if (!isCuberMode || isControl || (isEditable && !isCuberMode)) return;
+
+            // Cuber Logic below
             e.preventDefault();
             if (isRunning) { pauseTimer(); playClick(); document.body.classList.remove('cuber-running'); generateScramble(); } 
             else { pauseTimer(); timeLeft = 0; updateDisplay(); timerDisplay.classList.add('not-ready'); holdTimeout = setTimeout(() => { timerDisplay.classList.remove('not-ready'); timerDisplay.classList.add('ready'); isArmed = true; playTick(); }, 300); }
@@ -714,6 +735,17 @@
         document.body.addEventListener('mousedown', handleInputDown);
         document.body.addEventListener('touchend', handleInputUp);
         document.body.addEventListener('mouseup', handleInputUp);
+
+        // --- EXPLICIT FOCUS HANDLER FOR MOBILE ---
+        // Some mobile browsers need a direct click listener on the element to pop the keyboard
+        const forceFocus = (e) => {
+            if(!isCuberMode) {
+                e.target.focus();
+            }
+        };
+        timerDisplay.addEventListener('click', forceFocus);
+        mainTitle.addEventListener('click', forceFocus);
+
 
         function playTone(freq, type, duration, volume) {
             if (volume <= 0) return;
@@ -751,21 +783,16 @@
             settingsPanel.classList.add('hidden');
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch((err) => console.log(err));
-                // We rely on the event listener below to add the class
             } else {
                 if (document.exitFullscreen) { document.exitFullscreen(); }
-                // We rely on the event listener below to remove the class
             }
         }
 
-        // --- FIXED: EVENT LISTENER FOR ESCAPE KEY ---
         document.addEventListener('fullscreenchange', () => {
             if (!document.fullscreenElement) {
-                // Exited Fullscreen
                 document.body.classList.remove('fullscreen-mode');
                 document.body.classList.remove('show-controls');
             } else {
-                // Entered Fullscreen
                 document.body.classList.add('fullscreen-mode');
                 document.body.classList.remove('show-controls');
             }
