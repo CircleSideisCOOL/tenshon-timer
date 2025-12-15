@@ -32,7 +32,6 @@
             transition: background-color 0.5s ease, color 0.5s ease, font-family 0.3s ease;
             text-align: center;
             overflow: hidden;
-            /* user-select: none is kept for the body, but overridden for editable elements below */
             user-select: none;
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
@@ -67,8 +66,25 @@
             text-align: center;
             word-wrap: break-word;
         }
+        
+        /* NEW: Last Solve Display */
+        .last-solve {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.8vh;
+            color: rgba(255, 255, 255, 0.85);
+            margin-top: 3vh;
+            max-width: 85%;
+            word-wrap: break-word;
+            display: none; /* Hidden by default */
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 15px;
+            border-radius: 12px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
 
         body.fullscreen-mode .scramble-display { font-size: 4vh; margin-bottom: 4vh; }
+        body.fullscreen-mode .last-solve { font-size: 2vh; margin-top: 5vh; }
 
         h1 {
             font-size: 5vw;
@@ -84,8 +100,6 @@
             text-shadow: 0 2px 4px rgba(0,0,0,0.3);
             font-family: inherit;
             white-space: nowrap;
-            
-            /* FIX FOR MOBILE EDITING */
             user-select: text;
             -webkit-user-select: text;
             pointer-events: auto;
@@ -95,11 +109,11 @@
         h1:hover { background: rgba(255,255,255,0.1); }
         h1:focus { background: rgba(255,255,255,0.2); border-bottom: 2px solid var(--text-color); }
 
-        /* --- ROBUST TIMER SCALING --- */
+        /* --- TIMER --- */
         .timer-display {
             font-weight: bold;
             font-variant-numeric: tabular-nums; 
-            cursor: text; /* Changed from pointer to text to imply editing */
+            cursor: text; 
             line-height: 1;
             outline: none;
             border-bottom: 2px solid transparent;
@@ -108,27 +122,17 @@
             text-shadow: 0 4px 8px rgba(0,0,0,0.2);
             font-family: inherit;
             white-space: nowrap; 
-            
-            /* FIX FOR MOBILE EDITING */
             user-select: text;
             -webkit-user-select: text;
             pointer-events: auto;
-
-            /* Standard Size (05:00) */
             font-size: 22vw; 
         }
 
-        /* MILLISECONDS / CUBER MODE (00:00.00) */
-        /* Must shrink to fit the extra digits */
-        .timer-display.ms-mode {
-            font-size: 14vw !important; 
-        }
+        .timer-display.ms-mode { font-size: 14vw !important; }
 
         /* RETRO FONT OVERRIDES */
         body.retro-mode h1 { font-size: 3vw !important; }
-        /* Retro Standard */
         body.retro-mode .timer-display { font-size: 15vw !important; letter-spacing: -2px; }
-        /* Retro + Milliseconds (Needs aggressive shrinking) */
         body.retro-mode .timer-display.ms-mode { font-size: 9vw !important; letter-spacing: -3px; }
 
         /* Fullscreen adjustments */
@@ -186,57 +190,32 @@
         }
 
         .slider-group { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-        
-        /* Clickable Labels */
-        .toggle-row {
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            width: 100%;
-            cursor: pointer; /* Makes the whole row clickable */
-        }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; width: 100%; cursor: pointer; }
         .toggle-row label { cursor: pointer; flex-grow: 1; }
-
         .toggle-group { display: flex; flex-direction: column; gap: 10px; }
         .file-upload-group { display: flex; flex-direction: column; gap: 5px; }
 
         select {
-            width: 100%;
-            padding: 8px;
-            border-radius: 10px;
-            border: 1px solid rgba(128,128,128,0.5);
-            background: rgba(255,255,255,0.1);
-            color: inherit;
-            font-weight: bold;
-            cursor: pointer;
-            outline: none;
+            width: 100%; padding: 8px; border-radius: 10px;
+            border: 1px solid rgba(128,128,128,0.5); background: rgba(255,255,255,0.1);
+            color: inherit; font-weight: bold; cursor: pointer; outline: none;
         }
         select option { background: #222; color: white; }
 
         .pattern-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            margin-bottom: 5px;
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 5px;
         }
         
-        /* Pattern Buttons */
         .pattern-btn {
-            height: 45px;
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.3);
-            cursor: pointer;
-            transition: transform 0.1s, border-color 0.2s;
-            background-color: #222 !important; 
-            background-size: cover;
-            background-position: center;
+            height: 45px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.3);
+            cursor: pointer; transition: transform 0.1s, border-color 0.2s;
+            background-color: #222 !important; background-size: cover; background-position: center;
         }
         .pattern-btn:hover { transform: scale(1.05); border-color: #fff; }
         .pattern-btn:active { transform: scale(0.95); }
 
         .pat-none { background: #222; position: relative; }
         .pat-none::after { content: '🚫'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2rem;}
-
         .pat-dots { background-image: url('data:image/svg+xml;utf8,<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="4" fill="white" opacity="0.8"/></svg>'); }
         .pat-stripes { background-image: url('data:image/svg+xml;utf8,<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg"><path d="M0 20 L20 0 L10 0 L0 10 Z" fill="white" opacity="0.6"/><path d="M10 20 L20 10 L20 20 Z" fill="white" opacity="0.6"/></svg>'); }
         .pat-grid { background-image: url('data:image/svg+xml;utf8,<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg"><path d="M0 0 L20 0 L20 2 L0 2 Z M0 0 L2 0 L2 20 L0 20 Z" fill="white" opacity="0.8"/></svg>'); }
@@ -245,17 +224,8 @@
 
         input[type="file"] { font-size: 0.8rem; cursor: pointer; color: inherit; width: 100%; }
         input[type="file"]::file-selector-button {
-            border: none;
-            border-radius: 10px;
-            padding: 8px 12px;
-            background-color: var(--panel-text);
-            color: var(--panel-bg);
-            cursor: pointer;
-            font-weight: bold;
-            margin-right: 10px;
-            transition: 0.2s;
-            width: 100%;
-            margin-bottom: 5px;
+            border: none; border-radius: 10px; padding: 8px 12px; background-color: var(--panel-text);
+            color: var(--panel-bg); cursor: pointer; font-weight: bold; margin-right: 10px; transition: 0.2s; width: 100%; margin-bottom: 5px;
         }
 
         input[type="range"] { width: 100px; cursor: pointer; accent-color: var(--panel-text); }
@@ -263,20 +233,10 @@
         input[type="color"].mini-picker { width: 30px; height: 30px; padding: 0; border: none; background: none; cursor: pointer; }
 
         .controls {
-            position: fixed;
-            bottom: 20px;
-            background: var(--panel-bg);
-            backdrop-filter: blur(10px);
-            padding: 10px 20px;
-            border-radius: 50px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-            justify-content: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: opacity 0.3s ease, transform 0.3s ease, background-color 0.5s ease;
-            z-index: 100;
+            position: fixed; bottom: 20px; background: var(--panel-bg); backdrop-filter: blur(10px);
+            padding: 10px 20px; border-radius: 50px; display: flex; gap: 10px; align-items: center;
+            flex-wrap: wrap; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: opacity 0.3s ease, transform 0.3s ease, background-color 0.5s ease; z-index: 100;
         }
 
         body.fullscreen-mode .controls { opacity: 0; pointer-events: none; transform: translateY(30px); }
@@ -285,16 +245,9 @@
         body.cuber-running .controls, body.cuber-running .settings-panel { opacity: 0 !important; pointer-events: none !important; }
 
         button {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 20px;
-            font-weight: bold;
-            cursor: pointer;
-            background-color: var(--panel-text);
-            color: var(--panel-bg);
-            transition: transform 0.1s;
-            font-size: 0.9rem;
-            min-width: 40px;
+            padding: 8px 16px; border: none; border-radius: 20px; font-weight: bold; cursor: pointer;
+            background-color: var(--panel-text); color: var(--panel-bg); transition: transform 0.1s;
+            font-size: 0.9rem; min-width: 40px;
         }
         button:active { transform: scale(0.95); }
         input[type="color"] { border: none; width: 35px; height: 35px; cursor: pointer; background: none; padding: 0; }
@@ -306,6 +259,8 @@
         <div id="scrambleDisplay" class="scramble-display"></div>
         <h1 id="mainTitle" contenteditable="true" spellcheck="false">My Message</h1>
         <div class="timer-display" id="timer" contenteditable="true" spellcheck="false">05:00</div>
+        
+        <div id="lastSolve" class="last-solve"></div>
     </div>
 
     <div id="settingsPanel" class="settings-panel hidden">
@@ -440,6 +395,7 @@
         const timerDisplay = document.getElementById('timer');
         const mainTitle = document.getElementById('mainTitle');
         const scrambleDisplay = document.getElementById('scrambleDisplay');
+        const lastSolveDisplay = document.getElementById('lastSolve'); // New Reference
         const colorPicker = document.getElementById('colorPicker');
         const toggleBtn = document.getElementById('toggleBtn');
         const settingsPanel = document.getElementById('settingsPanel');
@@ -681,7 +637,11 @@
         function resetTimer() {
             pauseTimer();
             timeLeft = originalTime;
-            if (isCuberMode) { timeLeft = 0; generateScramble(); }
+            if (isCuberMode) { 
+                timeLeft = 0; 
+                lastSolveDisplay.innerHTML = ""; lastSolveDisplay.style.display = 'none'; // Clear history
+                generateScramble(); 
+            }
             updateDisplay();
             if(timerDisplay.innerText === "") { updateDisplay(); updateLayout(); }
         }
@@ -696,6 +656,7 @@
                 alert("Cuber Mode Active:\n1. Hold to Arm\n2. Release to Solve\n3. Tap to Stop");
             } else {
                 scrambleDisplay.style.display = 'none';
+                lastSolveDisplay.style.display = 'none';
                 timerDisplay.setAttribute('contenteditable', 'true');
                 timeLeft = 300000; originalTime = 300000; updateDisplay();
             }
@@ -706,22 +667,40 @@
         function toggleMsVisibility() { updateLayout(); updateDisplay(); playClick(); }
 
         const handleInputDown = (e) => {
-            // Check if we are interacting with editable elements (Timer or Title)
             const isEditable = e.target.id === 'timer' || e.target.id === 'mainTitle';
-            
-            // Standard controls check
             const isControl = e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('.controls') || e.target.closest('.settings-panel') || e.target.tagName === 'SELECT' || e.target.closest('.toggle-row');
             
-            // Fullscreen check logic
             if (document.body.classList.contains('fullscreen-mode') && !isControl && !isRunning && !isEditable) document.body.classList.toggle('show-controls');
             
-            // If we are editing, or clicking controls, or NOT in Cuber Mode, let the default behavior happen (keyboard pop up)
             if (!isCuberMode || isControl || (isEditable && !isCuberMode)) return;
 
-            // Cuber Logic below
             e.preventDefault();
-            if (isRunning) { pauseTimer(); playClick(); document.body.classList.remove('cuber-running'); generateScramble(); } 
-            else { pauseTimer(); timeLeft = 0; updateDisplay(); timerDisplay.classList.add('not-ready'); holdTimeout = setTimeout(() => { timerDisplay.classList.remove('not-ready'); timerDisplay.classList.add('ready'); isArmed = true; playTick(); }, 300); }
+            if (isRunning) { 
+                pauseTimer(); 
+                playClick(); 
+                document.body.classList.remove('cuber-running'); 
+                
+                // --- NEW: Save Last Solve before generating new scramble ---
+                const finalTime = timerDisplay.innerText;
+                const usedScramble = scrambleDisplay.innerText;
+                lastSolveDisplay.innerHTML = `<span style="color:#2ecc71; font-weight:bold; font-size: 1.2em;">Last: ${finalTime}</span><br><span style="font-size:0.8em; opacity:0.8; display:block; margin-top:5px;">${usedScramble}</span>`;
+                lastSolveDisplay.style.display = 'block';
+                // -----------------------------------------------------------
+
+                generateScramble(); 
+            } 
+            else { 
+                pauseTimer(); 
+                timeLeft = 0; 
+                updateDisplay(); 
+                timerDisplay.classList.add('not-ready'); 
+                holdTimeout = setTimeout(() => { 
+                    timerDisplay.classList.remove('not-ready'); 
+                    timerDisplay.classList.add('ready'); 
+                    isArmed = true; 
+                    playTick(); 
+                }, 300); 
+            }
         };
 
         const handleInputUp = (e) => {
@@ -736,13 +715,7 @@
         document.body.addEventListener('touchend', handleInputUp);
         document.body.addEventListener('mouseup', handleInputUp);
 
-        // --- EXPLICIT FOCUS HANDLER FOR MOBILE ---
-        // Some mobile browsers need a direct click listener on the element to pop the keyboard
-        const forceFocus = (e) => {
-            if(!isCuberMode) {
-                e.target.focus();
-            }
-        };
+        const forceFocus = (e) => { if(!isCuberMode) { e.target.focus(); } };
         timerDisplay.addEventListener('click', forceFocus);
         mainTitle.addEventListener('click', forceFocus);
 
