@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tenshon Timer</title>
+    <title>Tenshon Timer v3.1</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Caveat&family=Inter:wght@400;800&family=JetBrains+Mono:wght@700&family=Lobster&family=Orbitron:wght@700&family=Oswald:wght@500&family=Pacifico&family=Playfair+Display:wght@700&family=Press+Start+2P&family=Roboto:wght@400;700&display=swap');
 
@@ -95,8 +95,72 @@
             pointer-events: none;
         }
 
-        body.fullscreen-mode .scramble-display { font-size: 4vh; margin-bottom: 4vh; }
-        body.fullscreen-mode .last-solve { font-size: 2vh; margin-top: 5vh; }
+        /* POMODORO STATUS */
+        .pomo-status {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            margin-bottom: 2vh;
+            display: none;
+            backdrop-filter: blur(5px);
+            font-weight: bold;
+            animation: fadeIn 0.5s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* WORLD CLOCK */
+        .world-clock-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .local-time-wrapper {
+            margin-bottom: 20px;
+        }
+        .local-time {
+            font-size: 13vw; /* Adjusted to fit seconds */
+            font-weight: bold;
+            line-height: 1;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            font-variant-numeric: tabular-nums;
+        }
+        .local-date {
+            font-size: 4vw;
+            opacity: 0.8;
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .cities-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            width: 90%;
+            max-width: 1000px;
+        }
+        
+        .city-card {
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(5px);
+            padding: 10px 20px;
+            border-radius: 10px;
+            min-width: 140px; /* Slightly wider for seconds */
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .city-name { font-size: 0.8rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+        .city-time { font-size: 1.2rem; font-weight: bold; font-variant-numeric: tabular-nums; }
+        .city-date { font-size: 0.6rem; opacity: 0.5; }
 
         h1 {
             font-size: 5vw;
@@ -149,6 +213,7 @@
         body.retro-mode h1 { font-size: 3vw !important; }
         body.retro-mode .timer-display { font-size: 15vw !important; letter-spacing: -2px; }
         body.retro-mode .timer-display.ms-mode { font-size: 9vw !important; letter-spacing: -3px; }
+        body.retro-mode .local-time { font-size: 8vw !important; }
 
         body.fullscreen-mode .timer-display { font-size: 30vw; }
         body.fullscreen-mode .timer-display.ms-mode { font-size: 18vw !important; }
@@ -226,11 +291,11 @@
             display: flex; align-items: center; gap: 5px;
         }
 
-        select, .custom-file-upload, textarea {
+        select, .custom-file-upload, textarea, input[type="number"] {
             width: 100%; padding: 8px; border-radius: 6px;
             border: 1px solid rgba(128,128,128,0.5); background: rgba(0,0,0,0.2);
             color: inherit; font-weight: bold; cursor: pointer; outline: none;
-            font-size: 0.85rem;
+            font-size: 0.85rem; box-sizing: border-box;
             font-family: inherit;
         }
         textarea { resize: vertical; min-height: 80px; font-weight: normal; font-size: 0.8rem; line-height: 1.4; white-space: pre; }
@@ -334,10 +399,21 @@
 <body>
 
     <div class="container">
+        <div id="pomoStatus" class="pomo-status">💪 FOCUS MODE</div>
+        
         <div id="scrambleDisplay" class="scramble-display"></div>
         <h1 id="mainTitle" contenteditable="true" spellcheck="false">My Message</h1>
         <div class="timer-display" id="timer" contenteditable="true" spellcheck="false">05:00</div>
         <div id="lastSolve" class="last-solve"></div>
+
+        <div id="worldClockContainer" class="world-clock-container">
+            <div class="local-time-wrapper">
+                <div id="localTime" class="local-time">12:00:00</div>
+                <div id="localDate" class="local-date">Mon, Jan 1</div>
+            </div>
+            <div id="citiesGrid" class="cities-grid">
+                </div>
+        </div>
     </div>
 
     <div id="customAlert" class="custom-alert-box">
@@ -409,8 +485,46 @@
 
             <div class="settings-section">
                 <div class="section-title">🕹️ Modes</div>
+                
                 <div class="toggle-row" onclick="document.getElementById('cuberToggle').click()">
                     <label>🧊 Cuber Mode</label> <input type="checkbox" id="cuberToggle" onchange="toggleCuberMode()" onclick="event.stopPropagation()">
+                </div>
+                
+                <div class="toggle-row" onclick="document.getElementById('pomoToggle').click()" style="border-top:1px solid rgba(255,255,255,0.1); margin-top:5px; padding-top:5px;">
+                    <label>🍅 Pomodoro</label> <input type="checkbox" id="pomoToggle" onchange="togglePomoMode()" onclick="event.stopPropagation()">
+                </div>
+
+                <div id="pomoControls" style="display:none; margin-top:10px; background:rgba(0,0,0,0.2); padding:10px; border-radius:6px;">
+                    <div class="slider-group">
+                        <label style="width:70px">Work (m)</label>
+                        <input type="number" id="pomoWork" value="25" min="1" max="120" onchange="updatePomoSettings()">
+                    </div>
+                    <div class="slider-group">
+                        <label style="width:70px">Short (m)</label>
+                        <input type="number" id="pomoShort" value="5" min="1" max="60" onchange="updatePomoSettings()">
+                    </div>
+                    <div class="slider-group">
+                        <label style="width:70px">Long (m)</label>
+                        <input type="number" id="pomoLong" value="15" min="1" max="120" onchange="updatePomoSettings()">
+                    </div>
+                </div>
+
+                <div class="toggle-row" onclick="document.getElementById('clockToggle').click()" style="border-top:1px solid rgba(255,255,255,0.1); margin-top:5px; padding-top:5px;">
+                    <label>🌎 World Clock</label> <input type="checkbox" id="clockToggle" onchange="toggleClockMode()" onclick="event.stopPropagation()">
+                </div>
+                
+                <div id="clockControls" style="display:none; margin-top:10px; padding:10px; background:rgba(0,0,0,0.2); border-radius:6px;">
+                    <div class="section-title">Show Cities:</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                        <label><input type="checkbox" class="city-check" value="Manila" checked onchange="updateCitySelection()"> Manila</label>
+                        <label><input type="checkbox" class="city-check" value="Tokyo" checked onchange="updateCitySelection()"> Tokyo</label>
+                        <label><input type="checkbox" class="city-check" value="London" checked onchange="updateCitySelection()"> London</label>
+                        <label><input type="checkbox" class="city-check" value="New York" checked onchange="updateCitySelection()"> NYC</label>
+                        <label><input type="checkbox" class="city-check" value="Paris" onchange="updateCitySelection()"> Paris</label>
+                        <label><input type="checkbox" class="city-check" value="Sydney" onchange="updateCitySelection()"> Sydney</label>
+                        <label><input type="checkbox" class="city-check" value="Dubai" onchange="updateCitySelection()"> Dubai</label>
+                        <label><input type="checkbox" class="city-check" value="Los Angeles" onchange="updateCitySelection()"> LA</label>
+                    </div>
                 </div>
                 
                 <div class="toggle-row" onclick="document.getElementById('lyricToggle').click()" style="border-top:1px solid rgba(255,255,255,0.1); margin-top:5px; padding-top:5px;">
@@ -476,11 +590,33 @@
 
         // LYRIC VARS
         let isLyricMode = false;
-        let lyricLines = []; // Array of strings OR objects {time, text}
+        let lyricLines = []; 
         let isLrcFormat = false;
         let lyricIndex = 0;
-        let lyricInterval; // For simple scroll mode
+        let lyricInterval; 
         
+        // POMODORO VARS
+        let isPomoMode = false;
+        let pomoState = 'work'; // 'work', 'short', 'long'
+        let pomoWorkTime = 25;
+        let pomoShortTime = 5;
+        let pomoLongTime = 15;
+
+        // WORLD CLOCK VARS
+        let isClockMode = false;
+        let clockInterval;
+        let selectedCities = ["Manila", "Tokyo", "London", "New York"];
+        const cityTimeZones = {
+            "Manila": "Asia/Manila",
+            "Tokyo": "Asia/Tokyo",
+            "London": "Europe/London",
+            "New York": "America/New_York",
+            "Paris": "Europe/Paris",
+            "Sydney": "Australia/Sydney",
+            "Dubai": "Asia/Dubai",
+            "Los Angeles": "America/Los_Angeles"
+        };
+
         // ALARM VARS
         let alarmTimeout, alarmInterval, activeAlarmSource;
         let audioDuration = 0;
@@ -494,6 +630,12 @@
         const panelHeader = document.getElementById('panelHeader');
         const customAlert = document.getElementById('customAlert');
         const alertMsg = document.getElementById('alertMsg');
+        const pomoStatus = document.getElementById('pomoStatus');
+        
+        const worldClockContainer = document.getElementById('worldClockContainer');
+        const localTimeDisplay = document.getElementById('localTime');
+        const localDateDisplay = document.getElementById('localDate');
+        const citiesGrid = document.getElementById('citiesGrid');
 
         // Inputs
         const fontSelect = document.getElementById('fontSelect');
@@ -503,9 +645,22 @@
         const patColorInput = document.getElementById('patColor');
         const patOpacityInput = document.getElementById('patOpacity');
         const blendToggle = document.getElementById('blendToggle');
+        
         const cuberToggle = document.getElementById('cuberToggle');
+        const pomoToggle = document.getElementById('pomoToggle');
+        const clockToggle = document.getElementById('clockToggle');
+        
         const colorPicker = document.getElementById('colorPicker');
         
+        // Pomo Inputs
+        const pomoControls = document.getElementById('pomoControls');
+        const pomoWorkInput = document.getElementById('pomoWork');
+        const pomoShortInput = document.getElementById('pomoShort');
+        const pomoLongInput = document.getElementById('pomoLong');
+        
+        // Clock Inputs
+        const clockControls = document.getElementById('clockControls');
+
         // Lyric Inputs
         const lyricControls = document.getElementById('lyricControls');
         const lyricInput = document.getElementById('lyricInput');
@@ -526,13 +681,98 @@
             updateLayout(); updateDisplay();
         }
 
-        /* --- LYRIC SYNC & PARSING --- */
+        /* --- WORLD CLOCK LOGIC --- */
+        function toggleClockMode() {
+            isClockMode = clockToggle.checked;
+            clockControls.style.display = isClockMode ? 'block' : 'none';
+            playClick();
+
+            if (isClockMode) {
+                // Disable other modes
+                if (isCuberMode) { cuberToggle.checked = false; toggleCuberMode(); }
+                if (isPomoMode) { pomoToggle.checked = false; togglePomoMode(); }
+                
+                // Hide Standard Timer
+                timerDisplay.style.display = 'none';
+                mainTitle.style.display = 'none';
+                scrambleDisplay.style.display = 'none';
+                lastSolveDisplay.style.display = 'none';
+                
+                // Show World Clock
+                worldClockContainer.style.display = 'flex';
+                updateCitySelection();
+                startWorldClock();
+            } else {
+                worldClockContainer.style.display = 'none';
+                stopWorldClock();
+                updateLayout();
+            }
+        }
+
+        function updateCitySelection() {
+            const checkboxes = document.querySelectorAll('.city-check');
+            selectedCities = [];
+            checkboxes.forEach(cb => {
+                if(cb.checked) selectedCities.push(cb.value);
+            });
+            renderCities();
+        }
+
+        function renderCities() {
+            citiesGrid.innerHTML = '';
+            selectedCities.forEach(city => {
+                const div = document.createElement('div');
+                div.className = 'city-card';
+                div.innerHTML = `
+                    <div class="city-name">${city}</div>
+                    <div class="city-time" id="time-${city}">--:--:--</div>
+                    <div class="city-date" id="date-${city}">--</div>
+                `;
+                citiesGrid.appendChild(div);
+            });
+            updateClockTick();
+        }
+
+        function startWorldClock() {
+            updateClockTick();
+            clockInterval = setInterval(updateClockTick, 1000);
+        }
+
+        function stopWorldClock() {
+            clearInterval(clockInterval);
+        }
+
+        function updateClockTick() {
+            const now = new Date();
+            
+            // Local Time with Seconds
+            localTimeDisplay.innerText = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'});
+            localDateDisplay.innerText = now.toLocaleDateString([], {weekday: 'short', month: 'short', day: 'numeric'});
+
+            // Cities with Seconds
+            selectedCities.forEach(city => {
+                const tz = cityTimeZones[city];
+                if (!tz) return;
+                
+                try {
+                    const timeStr = now.toLocaleTimeString('en-US', { timeZone: tz, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    const dateStr = now.toLocaleDateString('en-US', { timeZone: tz, month: 'short', day: 'numeric' });
+                    
+                    const timeEl = document.getElementById(`time-${city}`);
+                    const dateEl = document.getElementById(`date-${city}`);
+                    if(timeEl) timeEl.innerText = timeStr;
+                    if(dateEl) dateEl.innerText = dateStr;
+                } catch(e) { console.error(e); }
+            });
+        }
+
+        /* --- LYRIC SYNC --- */
         function toggleLyricMode() {
             isLyricMode = document.getElementById('lyricToggle').checked;
             lyricControls.style.display = isLyricMode ? 'block' : 'none';
             if (isLyricMode) {
                 mainTitle.setAttribute('contenteditable', 'false');
-                parseLyrics(); // Initial parse
+                parseLyrics(); 
             } else {
                 stopLyrics();
                 mainTitle.setAttribute('contenteditable', 'true');
@@ -550,11 +790,8 @@
                 lyricLines = ["Paste Lyrics", "In Settings"];
                 isLrcFormat = false;
             } else {
-                // Check for LRC Timestamp: [00:12.50]
                 const lrcRegex = /^\[(\d{2}):(\d{2})(?:\.(\d{2,3}))?\](.*)$/;
                 const lines = raw.split('\n');
-                
-                // Detection
                 const hasTimestamps = lines.some(line => lrcRegex.test(line.trim()));
                 
                 if (hasTimestamps) {
@@ -566,38 +803,28 @@
                             const min = parseInt(match[1]);
                             const sec = parseInt(match[2]);
                             const ms = match[3] ? parseInt(match[3]) : 0;
-                            // Standardize MS (2 digits = 10ms units, 3 digits = 1ms units)
                             const timeVal = min * 60 + sec + (ms / (match[3].length === 3 ? 1000 : 100));
                             lyricLines.push({ time: timeVal, text: match[4].trim() });
                         }
                     });
-                    // Sort by time just in case
                     lyricLines.sort((a,b) => a.time - b.time);
                 } else {
                     isLrcFormat = false;
                     lyricLines = lines.filter(l => l.trim() !== '');
                 }
             }
-            
-            // UI Feedback
             if(isLrcFormat) {
-                speedControlGroup.style.display = 'none';
-                lrcStatus.style.display = 'block';
+                speedControlGroup.style.display = 'none'; lrcStatus.style.display = 'block';
             } else {
-                speedControlGroup.style.display = 'flex';
-                lrcStatus.style.display = 'none';
+                speedControlGroup.style.display = 'flex'; lrcStatus.style.display = 'none';
             }
         }
 
         function startLyrics() {
             if (!isLyricMode || lyricLines.length === 0) return;
             lyricIndex = 0;
-            
-            if (isLrcFormat) {
-                // LRC Mode: Logic handled in timer loop
-                mainTitle.innerText = ""; 
-            } else {
-                // Simple Mode: Interval
+            if (isLrcFormat) { mainTitle.innerText = ""; } 
+            else {
                 updateSimpleLyric();
                 const speed = parseInt(lyricSpeedInput.value) * 1000;
                 lyricInterval = setInterval(nextSimpleLyric, speed);
@@ -609,34 +836,22 @@
             mainTitle.classList.remove('lyric-fade-out', 'lyric-fade-in');
         }
 
-        // Simple Mode Helper
         function nextSimpleLyric() {
-            mainTitle.classList.remove('lyric-fade-in');
-            mainTitle.classList.add('lyric-fade-out');
+            mainTitle.classList.remove('lyric-fade-in'); mainTitle.classList.add('lyric-fade-out');
             setTimeout(() => {
                 lyricIndex = (lyricIndex + 1) % lyricLines.length;
                 updateSimpleLyric();
-                mainTitle.classList.remove('lyric-fade-out');
-                mainTitle.classList.add('lyric-fade-in');
+                mainTitle.classList.remove('lyric-fade-out'); mainTitle.classList.add('lyric-fade-in');
             }, 300);
         }
         function updateSimpleLyric() { mainTitle.innerText = lyricLines[lyricIndex]; }
 
-        // LRC Mode Helper (Called every 10ms in timer loop)
         function checkLrcSync(elapsedTime) {
-            // Find the last lyric that has passed
-            // Iterate backwards or maintain index
             let activeText = "";
             for (let i = 0; i < lyricLines.length; i++) {
-                if (elapsedTime >= lyricLines[i].time) {
-                    activeText = lyricLines[i].text;
-                } else {
-                    break; // Future lyric
-                }
+                if (elapsedTime >= lyricLines[i].time) activeText = lyricLines[i].text; else break;
             }
-            if (mainTitle.innerText !== activeText) {
-                mainTitle.innerText = activeText;
-            }
+            if (mainTitle.innerText !== activeText) mainTitle.innerText = activeText;
         }
 
         /* --- CUSTOM ALERT SYSTEM --- */
@@ -650,6 +865,8 @@
             timerDisplay.classList.add('glitch-active');
             mainTitle.classList.add('glitch-active');
             scrambleDisplay.classList.add('glitch-active');
+            localTimeDisplay.classList.add('glitch-active');
+            
             setTimeout(() => {
                 document.documentElement.style.setProperty('--current-font', selectedFont);
                 if (selectedFont.includes('Press Start 2P')) document.body.classList.add('retro-mode');
@@ -659,6 +876,7 @@
                 timerDisplay.classList.remove('glitch-active');
                 mainTitle.classList.remove('glitch-active');
                 scrambleDisplay.classList.remove('glitch-active');
+                localTimeDisplay.classList.remove('glitch-active');
             }, 550);
         }
 
@@ -674,14 +892,10 @@
             const rect = settingsPanel.getBoundingClientRect();
             const x = e.clientX || e.touches[0].clientX;
             const y = e.clientY || e.touches[0].clientY;
-            
-            // Allow resizing (corner threshold)
             if (x > rect.right - 20 || y > rect.bottom - 20 || x < rect.left + 10 || y < rect.top + 10) return; 
 
-            e.preventDefault(); 
-            isDragging = true;
-            dragOffsetX = x - rect.left;
-            dragOffsetY = y - rect.top;
+            e.preventDefault(); isDragging = true;
+            dragOffsetX = x - rect.left; dragOffsetY = y - rect.top;
             
             document.addEventListener('mousemove', dragWindow);
             document.addEventListener('touchmove', dragWindow, {passive: false});
@@ -694,15 +908,9 @@
             e.preventDefault();
             const x = e.clientX || e.touches[0].clientX;
             const y = e.clientY || e.touches[0].clientY;
-            
-            let newLeft = x - dragOffsetX;
-            let newTop = y - dragOffsetY;
-            
-            if (newLeft < 0) newLeft = 0;
-            if (newTop < 0) newTop = 0;
-
-            settingsPanel.style.left = `${newLeft}px`;
-            settingsPanel.style.top = `${newTop}px`;
+            let newLeft = x - dragOffsetX; let newTop = y - dragOffsetY;
+            if (newLeft < 0) newLeft = 0; if (newTop < 0) newTop = 0;
+            settingsPanel.style.left = `${newLeft}px`; settingsPanel.style.top = `${newTop}px`;
         }
 
         function stopDrag() {
@@ -755,8 +963,6 @@
             if (currentBgMode === 'image') return; 
             if (currentPatternType === 'none') { document.body.style.backgroundImage = 'none'; return; }
 
-            const col = hexToRgba(patColorInput.value, patOpacityInput.value);
-            // FIXED PATTERNS USING HEX + OPACITY INSTEAD OF RGBA
             const hex = patColorInput.value;
             const op = patOpacityInput.value / 100;
             
@@ -785,6 +991,11 @@
 
         /* --- TIMER CORE --- */
         function updateLayout() {
+            if(isClockMode) {
+                mainTitle.style.display = 'none';
+                timerDisplay.style.display = 'none';
+                return;
+            }
             const hasTitle = document.getElementById('titleToggle').checked;
             const showMs = document.getElementById('msToggle').checked || isCuberMode;
             const hasTimer = timerDisplay.innerText.trim() !== "";
@@ -820,7 +1031,11 @@
             scrambleDisplay.textContent = scramble.join(' ');
         }
 
-        function toggleTimer() { isRunning ? pauseTimer() : startTimer(); }
+        function toggleTimer() { 
+            if(isClockMode) return; // Disable start/stop in clock mode
+            isRunning ? pauseTimer() : startTimer(); 
+        }
+        
         function startTimer() {
             if (isRunning) return;
             stopAlarm(); 
@@ -843,8 +1058,6 @@
                     elapsed = timeLeft / 1000;
                 } else {
                     timeLeft = timerEndTime - now;
-                    // For Lyrics in Standard mode, we assume Sync to ELAPSED time since start
-                    // Total Duration - Current Remaining = Elapsed
                     elapsed = (originalTime - timeLeft) / 1000;
 
                     if (timeLeft > 0) {
@@ -852,6 +1065,24 @@
                         if (cs < lastSecond) { playTick(); lastSecond = cs; }
                     } else {
                         timeLeft = 0; updateDisplay(); pauseTimer(); playAlarm();
+                        
+                        // POMODORO AUTO SWITCH
+                        if(isPomoMode) {
+                            if(pomoState === 'work') {
+                                pomoState = 'short';
+                                timeLeft = pomoShortTime * 60 * 1000;
+                                originalTime = timeLeft;
+                                updatePomoUI();
+                                showAlert("Break Time! ☕<br>Click Start when ready.");
+                            } else {
+                                pomoState = 'work';
+                                timeLeft = pomoWorkTime * 60 * 1000;
+                                originalTime = timeLeft;
+                                updatePomoUI();
+                                showAlert("Back to Work! 💪<br>Click Start.");
+                            }
+                            updateDisplay();
+                        }
                     }
                 }
                 
@@ -870,6 +1101,7 @@
         }
         
         function resetTimer() {
+            if(isClockMode) return;
             pauseTimer(); 
             timeLeft = originalTime;
             stopAlarm();
@@ -881,6 +1113,9 @@
             isCuberMode = cuberToggle.checked; playClick();
             stopAlarm();
             if(isCuberMode) {
+                if(isPomoMode) { pomoToggle.checked = false; togglePomoMode(); }
+                if(isClockMode) { clockToggle.checked = false; toggleClockMode(); }
+                
                 pauseTimer(); timeLeft = 0; originalTime = 0; generateScramble();
                 scrambleDisplay.style.display = 'block'; updateDisplay();
                 timerDisplay.setAttribute('contenteditable', 'false');
@@ -891,6 +1126,55 @@
                 timeLeft = 300000; originalTime = 300000; updateDisplay();
             }
             updateLayout();
+        }
+
+        /* --- POMODORO LOGIC --- */
+        function togglePomoMode() {
+            isPomoMode = pomoToggle.checked;
+            pomoControls.style.display = isPomoMode ? 'block' : 'none';
+            pomoStatus.style.display = isPomoMode ? 'block' : 'none';
+            playClick();
+
+            if (isPomoMode) {
+                if(isCuberMode) { cuberToggle.checked = false; toggleCuberMode(); }
+                if(isClockMode) { clockToggle.checked = false; toggleClockMode(); }
+                
+                updatePomoSettings();
+                pomoState = 'work';
+                timeLeft = pomoWorkTime * 60 * 1000;
+                originalTime = timeLeft;
+                updatePomoUI();
+                updateDisplay();
+                timerDisplay.setAttribute('contenteditable', 'false');
+            } else {
+                timerDisplay.setAttribute('contenteditable', 'true');
+                pomoStatus.style.display = 'none';
+            }
+        }
+
+        function updatePomoSettings() {
+            pomoWorkTime = parseInt(pomoWorkInput.value);
+            pomoShortTime = parseInt(pomoShortInput.value);
+            pomoLongTime = parseInt(pomoLongInput.value);
+            if(!isRunning && isPomoMode && pomoState === 'work') {
+                timeLeft = pomoWorkTime * 60 * 1000; originalTime = timeLeft; updateDisplay();
+            }
+        }
+
+        function updatePomoUI() {
+            if(pomoState === 'work') {
+                pomoStatus.innerText = "💪 FOCUS MODE";
+                pomoStatus.style.color = "#ffffff";
+                pomoStatus.style.background = "rgba(231, 76, 60, 0.4)";
+            } else if (pomoState === 'short') {
+                pomoStatus.innerText = "☕ SHORT BREAK";
+                pomoStatus.style.color = "#ffffff";
+                pomoStatus.style.background = "rgba(46, 204, 113, 0.4)";
+            } else if (pomoState === 'long') {
+                pomoStatus.innerText = "🧘 LONG BREAK";
+                pomoStatus.style.color = "#ffffff";
+                pomoStatus.style.background = "rgba(52, 152, 219, 0.4)";
+            }
         }
 
         function toggleTitleVisibility() { updateLayout(); playClick(); }
@@ -930,7 +1214,7 @@
         document.body.addEventListener('touchend', handleInputUp);
         document.body.addEventListener('mouseup', handleInputUp);
 
-        const forceFocus = (e) => { if(!isCuberMode) e.target.focus(); };
+        const forceFocus = (e) => { if(!isCuberMode && !isPomoMode && !isClockMode) e.target.focus(); };
         timerDisplay.addEventListener('click', forceFocus); mainTitle.addEventListener('click', forceFocus);
 
         /* --- AUDIO & ALARM SYSTEM --- */
@@ -1003,7 +1287,7 @@
         function playCustomPreview() {
              if (volAlarm <= 0) return;
              if (audioCtx.state === 'suspended') audioCtx.resume();
-             stopAlarm(); // Stop any looping alarm
+             stopAlarm(); 
              
              if (customAlarmBuffer) {
                  const start = parseFloat(trimStartInput.value);
@@ -1015,13 +1299,13 @@
                  activeAlarmSource.connect(gainNode); gainNode.connect(audioCtx.destination);
                  activeAlarmSource.start(0, start, dur);
              } else {
-                 playAlarm(); // Preview default alarm
+                 playAlarm(); 
              }
         }
 
         function clearCustomAudio() {
             customAlarmBuffer = null;
-            document.getElementById('audioFile').value = ""; // Clear file input
+            document.getElementById('audioFile').value = ""; 
             trimmerDiv.style.display = 'none';
             playClick();
             showAlert("Custom Alarm Removed.<br>Reverted to Default.");
@@ -1043,9 +1327,9 @@
         });
 
         /* --- TEXT EDITING --- */
-        timerDisplay.addEventListener('focus', () => { if(isCuberMode) { timerDisplay.blur(); return; } isEditing = true; pauseTimer(); });
+        timerDisplay.addEventListener('focus', () => { if(isCuberMode || isPomoMode || isClockMode) { timerDisplay.blur(); return; } isEditing = true; pauseTimer(); });
         timerDisplay.addEventListener('blur', () => { 
-            if(isCuberMode) return;
+            if(isCuberMode || isPomoMode || isClockMode) return;
             let txt = timerDisplay.innerText.trim();
             if (txt === "") { updateLayout(); isEditing = false; return; }
             let s = 0;
