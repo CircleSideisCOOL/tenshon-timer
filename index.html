@@ -29,12 +29,743 @@
             background-blend-mode: var(--bg-blend);
             color: var(--text-color);
             font-family: var(--current-font);
-            transition: background-color 0.5s ease, color 0.5s ease, font-family 0.3s ease;
+            transition: background-color 0.5s ease, color 0.5s ease;
             text-align: center;
             overflow: hidden;
             user-select: none;
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        body.custom-image-mode { background-repeat: no-repeat !important; }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes font-glitch {
+            0% { transform: skewX(0deg) scale(1); filter: blur(0); opacity: 1; }
+            20% { transform: skewX(-15deg) scale(0.95); filter: blur(2px); opacity: 0.8; }
+            40% { transform: skewX(15deg) scale(1.05); filter: blur(4px); opacity: 0.5; color: #00ff00; }
+            60% { transform: skewX(-5deg) scale(0.98); filter: blur(1px); opacity: 0.9; color: #ff00ff; }
+            80% { transform: skewX(5deg) scale(1.02); filter: blur(0.5px); }
+            100% { transform: skewX(0deg) scale(1); filter: blur(0); opacity: 1; }
+        }
+
+        .glitch-active {
+            animation: font-glitch 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+        }
+
+        /* Scramble Text */
+        .scramble-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 3vh; 
+            margin-bottom: 2vh;
+            max-width: 95%;
+            line-height: 1.2;
+            display: none;
+            opacity: 0.9;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            pointer-events: none;
+            text-align: center;
+            word-wrap: break-word;
+        }
+        
+        .last-solve {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.8vh;
+            color: rgba(255, 255, 255, 0.85);
+            margin-top: 3vh;
+            max-width: 85%;
+            word-wrap: break-word;
+            display: none;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 15px;
+            border-radius: 12px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        body.fullscreen-mode .scramble-display { font-size: 4vh; margin-bottom: 4vh; }
+        body.fullscreen-mode .last-solve { font-size: 2vh; margin-top: 5vh; }
+
+        h1 {
+            font-size: 5vw;
+            margin: 0;
+            outline: none;
+            border: 1px solid transparent;
+            cursor: text;
+            display: none;
+            padding: 0 10px;
+            border-radius: 10px;
+            line-height: 1.2;
+            width: 80%;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            font-family: inherit;
+            white-space: nowrap;
+            user-select: text;
+            -webkit-user-select: text;
+            pointer-events: auto;
+        }
+
+        h1.solo-mode { font-size: 15vw; display: block; }
+        h1:hover { background: rgba(255,255,255,0.1); }
+        h1:focus { background: rgba(255,255,255,0.2); border-bottom: 2px solid var(--text-color); }
+
+        /* --- TIMER --- */
+        .timer-display {
+            font-weight: bold;
+            font-variant-numeric: tabular-nums; 
+            cursor: text; 
+            line-height: 1;
+            outline: none;
+            border-bottom: 2px solid transparent;
+            display: inline-block;
+            transition: font-size 0.3s ease, color 0.1s;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            font-family: inherit;
+            white-space: nowrap; 
+            user-select: text;
+            -webkit-user-select: text;
+            pointer-events: auto;
+            font-size: 22vw; 
+        }
+
+        .timer-display.ms-mode { font-size: 14vw !important; }
+
+        /* RETRO FONT OVERRIDES */
+        body.retro-mode h1 { font-size: 3vw !important; }
+        body.retro-mode .timer-display { font-size: 15vw !important; letter-spacing: -2px; }
+        body.retro-mode .timer-display.ms-mode { font-size: 9vw !important; letter-spacing: -3px; }
+
+        body.fullscreen-mode .timer-display { font-size: 30vw; }
+        body.fullscreen-mode .timer-display.ms-mode { font-size: 18vw !important; }
+        body.fullscreen-mode.retro-mode .timer-display { font-size: 20vw !important; }
+        body.fullscreen-mode.retro-mode .timer-display.ms-mode { font-size: 12vw !important; }
+
+        .timer-display.not-ready { color: #e74c3c !important; }
+        .timer-display.ready { color: #2ecc71 !important; }
+        .timer-display.shrink-mode { font-size: 15vw; }
+        body.fullscreen-mode .timer-display.shrink-mode { font-size: 20vw; }
+        body.fullscreen-mode h1.solo-mode { font-size: 20vw; }
+
+        /* --- DRAGGABLE SETTINGS PANEL --- */
+        .settings-panel {
+            position: fixed;
+            top: 20%;
+            left: 20px;
+            width: 300px;
+            height: 400px;
+            background-color: var(--panel-bg); 
+            color: var(--panel-text);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+            transition: opacity 0.3s, transform 0.3s;
+            z-index: 1000;
+            border: 1px solid rgba(128, 128, 128, 0.4); 
+            font-family: 'Segoe UI', sans-serif;
+            resize: both; /* Enable resizing */
+            overflow: hidden;
+            min-width: 280px;
+            min-height: 200px;
+        }
+
+        .settings-panel.hidden { opacity: 0; pointer-events: none; transform: scale(0.9); }
+        
+        /* Header for Dragging */
+        .panel-header {
+            padding: 10px 15px;
+            background: rgba(255,255,255,0.1);
+            cursor: grab;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            border-bottom: 1px solid rgba(128,128,128,0.3);
+            flex-shrink: 0;
+        }
+        .panel-header:active { cursor: grabbing; }
+
+        .panel-content {
+            padding: 15px;
+            overflow-y: auto;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        /* Custom Scrollbar */
+        .panel-content::-webkit-scrollbar { width: 6px; height: 6px; }
+        .panel-content::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.5); border-radius: 3px; }
+        .panel-content::-webkit-scrollbar-corner { background: transparent; }
+
+        /* Controls */
+        .section-title, .slider-group, .toggle-group label, .file-upload-group label {
+            color: inherit; font-size: 0.85rem; font-weight: bold;
+        }
+        .section-title {
+            text-transform: uppercase; letter-spacing: 1px; opacity: 0.8;
+            margin-bottom: 5px; border-bottom: 1px solid rgba(128,128,128,0.3); padding-bottom: 3px;
+        }
+        .slider-group { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; width: 100%; cursor: pointer; }
+        .toggle-row label { cursor: pointer; flex-grow: 1; }
+        .toggle-group { display: flex; flex-direction: column; gap: 10px; }
+        .file-upload-group { display: flex; flex-direction: column; gap: 5px; }
+
+        select {
+            width: 100%; padding: 8px; border-radius: 10px;
+            border: 1px solid rgba(128,128,128,0.5); background: rgba(255,255,255,0.1);
+            color: inherit; font-weight: bold; cursor: pointer; outline: none;
+        }
+        select option { background: #222; color: white; }
+
+        .pattern-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 5px; }
+        .pattern-btn {
+            height: 45px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.3);
+            cursor: pointer; transition: transform 0.1s, border-color 0.2s;
+            background-color: #222 !important; background-size: cover; background-position: center;
+        }
+        .pattern-btn:hover { transform: scale(1.05); border-color: #fff; }
+
+        .pat-none { background: #222; position: relative; }
+        .pat-none::after { content: '🚫'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2rem;}
+        .pat-dots { background-image: url('data:image/svg+xml;utf8,<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="4" fill="white" opacity="0.8"/></svg>'); }
+        .pat-stripes { background-image: url('data:image/svg+xml;utf8,<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg"><path d="M0 20 L20 0 L10 0 L0 10 Z" fill="white" opacity="0.6"/><path d="M10 20 L20 10 L20 20 Z" fill="white" opacity="0.6"/></svg>'); }
+        .pat-grid { background-image: url('data:image/svg+xml;utf8,<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg"><path d="M0 0 L20 0 L20 2 L0 2 Z M0 0 L2 0 L2 20 L0 20 Z" fill="white" opacity="0.8"/></svg>'); }
+        .pat-check { background-image: url('data:image/svg+xml;utf8,<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="10" height="10" fill="white" opacity="0.5"/><rect x="10" y="10" width="10" height="10" fill="white" opacity="0.5"/></svg>'); }
+        .pat-zig { background-image: url('data:image/svg+xml;utf8,<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg"><path d="M0 0 L10 10 L20 0 L20 5 L10 15 L0 5 Z" fill="white" opacity="0.6"/></svg>'); }
+
+        input[type="file"]::file-selector-button {
+            border: none; border-radius: 10px; padding: 8px 12px; background-color: var(--panel-text);
+            color: var(--panel-bg); cursor: pointer; font-weight: bold; margin-right: 10px; transition: 0.2s; width: 100%; margin-bottom: 5px;
+        }
+        input[type="range"] { width: 100px; cursor: pointer; accent-color: var(--panel-text); }
+        input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; accent-color: var(--panel-text); }
+        input[type="color"].mini-picker { width: 30px; height: 30px; padding: 0; border: none; background: none; cursor: pointer; }
+
+        /* Floating Controls (Bottom) */
+        .controls {
+            position: fixed; bottom: 20px; background: var(--panel-bg); backdrop-filter: blur(10px);
+            padding: 10px 20px; border-radius: 50px; display: flex; gap: 10px; align-items: center;
+            flex-wrap: wrap; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: opacity 0.3s ease, transform 0.3s ease, background-color 0.5s ease; z-index: 100;
+        }
+
+        body.fullscreen-mode .controls { opacity: 0; pointer-events: none; transform: translateY(30px); }
+        body.fullscreen-mode.show-controls .controls { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        body.fullscreen-mode:not(.show-controls) .settings-panel { opacity: 0 !important; pointer-events: none !important; }
+        body.cuber-running .controls, body.cuber-running .settings-panel { opacity: 0 !important; pointer-events: none !important; }
+
+        button {
+            padding: 8px 16px; border: none; border-radius: 20px; font-weight: bold; cursor: pointer;
+            background-color: var(--panel-text); color: var(--panel-bg); transition: transform 0.1s;
+            font-size: 0.9rem; min-width: 40px;
+        }
+        button:active { transform: scale(0.95); }
+        input[type="color"] { border: none; width: 35px; height: 35px; cursor: pointer; background: none; padding: 0; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="scrambleDisplay" class="scramble-display"></div>
+        <h1 id="mainTitle" contenteditable="true" spellcheck="false">My Message</h1>
+        <div class="timer-display" id="timer" contenteditable="true" spellcheck="false">05:00</div>
+        <div id="lastSolve" class="last-solve"></div>
+    </div>
+
+    <div id="settingsPanel" class="settings-panel hidden">
+        <div class="panel-header" id="panelHeader">
+            <span>Settings</span>
+            <span style="cursor: pointer;" onclick="toggleSettings()">✖</span>
+        </div>
+        <div class="panel-content">
+            <div class="section-title">Visuals & Text</div>
+            <div style="margin-bottom: 10px;">
+                <label style="font-size:0.9rem; font-weight:bold; display:block; margin-bottom:5px;">Font Style:</label>
+                <select id="fontSelect" onchange="changeFont()">
+                    <option value="'Inter', sans-serif">Modern (Inter)</option>
+                    <option value="'Roboto', sans-serif">Standard (Roboto)</option>
+                    <option value="'Orbitron', sans-serif">Digital (Orbitron)</option>
+                    <option value="'JetBrains Mono', monospace">Coding (JetBrains)</option>
+                    <option value="'Press Start 2P', cursive">Retro (Pixel)</option>
+                    <option value="'Bangers', cursive">Impact (Bangers)</option>
+                    <option value="'Lobster', cursive">Fun (Lobster)</option>
+                    <option value="'Oswald', sans-serif">Bold (Oswald)</option>
+                    <option value="'Playfair Display', serif">Elegant (Playfair)</option>
+                    <option value="'Pacifico', cursive">Handwriting (Pacifico)</option>
+                    <option value="'Caveat', cursive">Marker (Caveat)</option>
+                </select>
+            </div>
+
+            <div class="toggle-group">
+                <div class="toggle-row" onclick="document.getElementById('titleToggle').click()">
+                    <label>Show Text Message</label>
+                    <input type="checkbox" id="titleToggle" onchange="toggleTitleVisibility()" onclick="event.stopPropagation()">
+                </div>
+                <div class="toggle-row" onclick="document.getElementById('msToggle').click()">
+                    <label>Show Milliseconds</label>
+                    <input type="checkbox" id="msToggle" onchange="toggleMsVisibility()" onclick="event.stopPropagation()">
+                </div>
+            </div>
+
+            <div class="section-title" style="margin-top: 10px;">Background Pattern</div>
+            <div class="pattern-grid">
+                <div class="pattern-btn pat-none" onclick="selectPattern('none')" title="No Pattern"></div>
+                <div class="pattern-btn pat-dots" onclick="selectPattern('dots')" title="Dots"></div>
+                <div class="pattern-btn pat-stripes" onclick="selectPattern('stripes')" title="Stripes"></div>
+                <div class="pattern-btn pat-grid" onclick="selectPattern('grid')" title="Grid"></div>
+                <div class="pattern-btn pat-check" onclick="selectPattern('check')" title="Checkers"></div>
+                <div class="pattern-btn pat-zig" onclick="selectPattern('zig')" title="ZigZag"></div>
+            </div>
+            
+            <div class="slider-group" style="justify-content: flex-start; gap: 15px;">
+                <label>Color:</label>
+                <input type="color" id="patColor" class="mini-picker" value="#ffffff" oninput="updatePatternStyle()">
+                <label>Opacity:</label>
+                <input type="range" id="patOpacity" min="5" max="100" value="20" style="flex-grow:1" oninput="updatePatternStyle()">
+            </div>
+            <div class="toggle-row" onclick="document.getElementById('blendToggle').click()" style="margin-bottom: 5px;">
+                <label>Blend with Background</label>
+                <input type="checkbox" id="blendToggle" checked onchange="updatePatternStyle()" onclick="event.stopPropagation()">
+            </div>
+
+            <div class="section-title" style="margin-top: 10px;">Background Adjustments</div>
+            <div class="slider-group">
+                <label>🔍 Zoom</label>
+                <input type="range" id="bgZoom" min="10" max="200" value="30" oninput="updateBgParams()">
+            </div>
+            <div class="slider-group">
+                <label>↔️ Pan X</label>
+                <input type="range" id="bgPanX" min="0" max="100" value="50" oninput="updateBgParams()">
+            </div>
+            <div class="slider-group">
+                <label>↕️ Pan Y</label>
+                <input type="range" id="bgPanY" min="0" max="100" value="50" oninput="updateBgParams()">
+            </div>
+
+            <div class="file-upload-group">
+                <label>Or Upload Background Image:</label>
+                <input type="file" id="bgImageFile" accept="image/*">
+            </div>
+
+            <div class="section-title" style="margin-top: 10px;">Modes</div>
+            <div class="toggle-row" onclick="document.getElementById('cuberToggle').click()">
+                <label title="Hold screen to start">Cuber Mode 🧊</label>
+                <input type="checkbox" id="cuberToggle" onchange="toggleCuberMode()" onclick="event.stopPropagation()">
+            </div>
+
+            <div class="section-title" style="margin-top: 10px;">Audio Levels</div>
+            <div class="slider-group">
+                <label>🖱️ Click</label>
+                <input type="range" min="0" max="100" value="30" oninput="volClick = this.value/100; playClick()">
+            </div>
+            <div class="slider-group">
+                <label>⏱️ Tick</label>
+                <input type="range" min="0" max="100" value="10" oninput="volTick = this.value/100">
+            </div>
+            <div class="slider-group">
+                <label>🔔 Alarm</label>
+                <input type="range" min="0" max="100" value="50" oninput="volAlarm = this.value/100">
+            </div>
+            <div class="file-upload-group">
+                <label>Custom Alarm Sound:</label>
+                <input type="file" id="audioFile" accept="audio/*">
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <input type="color" id="colorPicker" value="#3498db" title="Change Background Color">
+        <button id="toggleBtn" onmousedown="playClick()" onclick="toggleTimer()">Start</button>
+        <button onmousedown="playClick()" onclick="resetTimer()">Reset</button>
+        <button onmousedown="playClick()" onclick="toggleFullScreen()" title="Fullscreen">⛶</button>
+        <button onmousedown="playClick()" onclick="toggleSettings()" title="Settings">⚙️</button>
+    </div>
+
+    <script>
+        let timeLeft = 300000, originalTime = 300000;
+        let timerInterval, isRunning = false, isEditing = false;
+        let isCuberMode = false, holdTimeout, isArmed = false;
+        let timerEndTime = 0, timerStartTime = 0, lastSecond = 0;
+        let currentBgMode = 'none', currentPatternType = 'none';
+        let volClick = 0.3, volTick = 0.1, volAlarm = 0.5, customAlarmBuffer = null;
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        // Elements
+        const timerDisplay = document.getElementById('timer');
+        const mainTitle = document.getElementById('mainTitle');
+        const scrambleDisplay = document.getElementById('scrambleDisplay');
+        const lastSolveDisplay = document.getElementById('lastSolve');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const panelHeader = document.getElementById('panelHeader');
+
+        // Settings Inputs
+        const fontSelect = document.getElementById('fontSelect');
+        const sliderZoom = document.getElementById('bgZoom');
+        const sliderPanX = document.getElementById('bgPanX');
+        const sliderPanY = document.getElementById('bgPanY');
+        const patColorInput = document.getElementById('patColor');
+        const patOpacityInput = document.getElementById('patOpacity');
+        const blendToggle = document.getElementById('blendToggle');
+        const cuberToggle = document.getElementById('cuberToggle');
+        const colorPicker = document.getElementById('colorPicker');
+
+        function init() {
+            updateColors(colorPicker.value);
+            // Don't call changeFont here to avoid init animation
+            if(cuberToggle.checked) { isCuberMode = true; timerDisplay.setAttribute('contenteditable', 'false'); scrambleDisplay.style.display = 'block'; generateScramble(); }
+            updateLayout(); updateDisplay();
+        }
+
+        /* --- FONT ANIMATION --- */
+        function changeFont() {
+            const selectedFont = fontSelect.value;
+            playClick();
+
+            // 1. Add Animation Classes
+            timerDisplay.classList.add('glitch-active');
+            mainTitle.classList.add('glitch-active');
+            scrambleDisplay.classList.add('glitch-active');
+
+            // 2. Change Font shortly after animation starts
+            setTimeout(() => {
+                document.documentElement.style.setProperty('--current-font', selectedFont);
+                if (selectedFont.includes('Press Start 2P')) document.body.classList.add('retro-mode');
+                else document.body.classList.remove('retro-mode');
+            }, 100);
+
+            // 3. Cleanup classes
+            setTimeout(() => {
+                timerDisplay.classList.remove('glitch-active');
+                mainTitle.classList.remove('glitch-active');
+                scrambleDisplay.classList.remove('glitch-active');
+            }, 450);
+        }
+
+        /* --- DRAGGABLE WINDOW LOGIC --- */
+        let isDragging = false;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+
+        panelHeader.addEventListener('mousedown', startDrag);
+        panelHeader.addEventListener('touchstart', startDrag, {passive: false});
+
+        function startDrag(e) {
+            e.preventDefault(); // Prevent text selection
+            isDragging = true;
+            const clientX = e.clientX || e.touches[0].clientX;
+            const clientY = e.clientY || e.touches[0].clientY;
+            const rect = settingsPanel.getBoundingClientRect();
+            dragOffsetX = clientX - rect.left;
+            dragOffsetY = clientY - rect.top;
+            
+            document.addEventListener('mousemove', dragWindow);
+            document.addEventListener('touchmove', dragWindow, {passive: false});
+            document.addEventListener('mouseup', stopDrag);
+            document.addEventListener('touchend', stopDrag);
+        }
+
+        function dragWindow(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            const clientX = e.clientX || e.touches[0].clientX;
+            const clientY = e.clientY || e.touches[0].clientY;
+            
+            // Boundary checks (basic)
+            let newLeft = clientX - dragOffsetX;
+            let newTop = clientY - dragOffsetY;
+            
+            // Prevent dragging completely off screen
+            const maxX = window.innerWidth - 50;
+            const maxY = window.innerHeight - 50;
+            if (newLeft < -200) newLeft = -200;
+            if (newLeft > maxX) newLeft = maxX;
+            if (newTop < 0) newTop = 0;
+            if (newTop > maxY) newTop = maxY;
+
+            settingsPanel.style.left = `${newLeft}px`;
+            settingsPanel.style.top = `${newTop}px`;
+            // Remove automatic centering transform once dragged
+            settingsPanel.style.transform = 'none'; 
+        }
+
+        function stopDrag() {
+            isDragging = false;
+            document.removeEventListener('mousemove', dragWindow);
+            document.removeEventListener('touchmove', dragWindow);
+            document.removeEventListener('mouseup', stopDrag);
+            document.removeEventListener('touchend', stopDrag);
+        }
+
+        /* --- COLORS & PATTERNS --- */
+        function updateColors(hex) {
+            document.documentElement.style.setProperty('--bg-color', hex);
+            const c = hex.replace("#", "");
+            const r = parseInt(c.substr(0,2),16), g = parseInt(c.substr(2,2),16), b = parseInt(c.substr(4,2),16);
+            const yiq = ((r*299)+(g*587)+(b*114))/1000;
+            const contrast = (yiq >= 128) ? '#000000' : '#ffffff';
+            document.documentElement.style.setProperty('--text-color', contrast);
+            const panelBg = (contrast === '#ffffff') ? 'rgba(20, 20, 20, 0.95)' : 'rgba(245, 245, 245, 0.95)';
+            const panelText = (contrast === '#ffffff') ? '#ffffff' : '#000000';
+            document.documentElement.style.setProperty('--panel-bg', panelBg);
+            document.documentElement.style.setProperty('--panel-text', panelText);
+        }
+        colorPicker.addEventListener('input', (e) => updateColors(e.target.value));
+
+        function hexToRgba(hex, alphaPercent) {
+            const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alphaPercent/100})`;
+        }
+
+        function updateBgParams() {
+            const zoom = sliderZoom.value, panX = sliderPanX.value, panY = sliderPanY.value;
+            document.body.style.backgroundPosition = `${panX}% ${panY}%`;
+            const unit = currentBgMode === 'image' ? '%' : 'px';
+            document.body.style.backgroundSize = currentBgMode === 'image' ? `${zoom}%` : `${zoom}px ${zoom}px`;
+        }
+
+        function selectPattern(type) {
+            playClick();
+            currentBgMode = (type === 'none') ? 'none' : 'pattern';
+            currentPatternType = type;
+            document.body.classList.remove('custom-image-mode');
+            if (type !== 'none') { sliderZoom.value = 30; sliderPanX.value = 50; sliderPanY.value = 50; }
+            updatePatternStyle(); updateBgParams();     
+        }
+
+        function updatePatternStyle() {
+            const blend = blendToggle.checked ? 'overlay' : 'normal';
+            document.documentElement.style.setProperty('--bg-blend', blend);
+            if (currentBgMode === 'image') return; 
+            if (currentPatternType === 'none') { document.body.style.backgroundImage = 'none'; return; }
+
+            const col = hexToRgba(patColorInput.value, patOpacityInput.value);
+            let svg = '';
+            const t = currentPatternType;
+            if(t==='dots') svg=`<circle cx="10" cy="10" r="5" fill="${col}"/>`;
+            else if(t==='stripes') svg=`<path d="M0 20 L20 0 L10 0 L0 10 Z" fill="${col}"/><path d="M10 20 L20 10 L20 20 Z" fill="${col}"/>`;
+            else if(t==='grid') svg=`<path d="M0 0 L20 0 L20 2 L0 2 Z M0 0 L2 0 L2 20 L0 20 Z" fill="${col}"/>`;
+            else if(t==='check') svg=`<rect x="0" y="0" width="10" height="10" fill="${col}"/><rect x="10" y="10" width="10" height="10" fill="${col}"/>`;
+            else if(t==='zig') svg=`<path d="M0 0 L10 10 L20 0 L20 5 L10 15 L0 5 Z" fill="${col}"/>`;
+
+            document.body.style.backgroundImage = `url("data:image/svg+xml;utf8,<svg width='20' height='20' xmlns='http://www.w3.org/2000/svg'>${encodeURIComponent(svg)}</svg>")`;
+        }
+
+        document.getElementById('bgImageFile').addEventListener('change', function(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                currentBgMode = 'image'; sliderZoom.value = 100; sliderPanX.value = 50; sliderPanY.value = 50;
+                document.body.style.backgroundImage = `url("${ev.target.result}")`;
+                document.body.classList.add('custom-image-mode');
+                updatePatternStyle(); updateBgParams(); playClick(); alert("Background Image Loaded!");
+            }; reader.readAsDataURL(file);
+        });
+
+        /* --- TIMER CORE --- */
+        function updateLayout() {
+            const hasTitle = document.getElementById('titleToggle').checked;
+            const showMs = document.getElementById('msToggle').checked || isCuberMode;
+            const hasTimer = timerDisplay.innerText.trim() !== "";
+            mainTitle.style.display = hasTitle ? 'block' : 'none';
+            timerDisplay.style.display = hasTimer ? 'inline-block' : 'none';
+            if (showMs) timerDisplay.classList.add('ms-mode'); else timerDisplay.classList.remove('ms-mode');
+            
+            if (hasTitle && hasTimer) { timerDisplay.classList.add('shrink-mode'); mainTitle.classList.remove('solo-mode'); }
+            else if (!hasTitle && hasTimer) { timerDisplay.classList.remove('shrink-mode'); }
+            else if (hasTitle && !hasTimer) { mainTitle.classList.add('solo-mode'); }
+        }
+
+        function updateDisplay() {
+            if (isEditing) return;
+            const ts = Math.floor(timeLeft / 1000);
+            const m = Math.floor(ts / 60);
+            const s = ts % 60;
+            const ms = Math.floor((timeLeft % 1000) / 10); 
+            let d = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            if (document.getElementById('msToggle').checked || isCuberMode) d += `.${ms.toString().padStart(2, '0')}`;
+            timerDisplay.innerText = d;
+        }
+
+        function generateScramble() {
+            const moves = ['R', 'L', 'U', 'D', 'F', 'B'];
+            const modifiers = ['', "'", '2'];
+            let scramble = [], lastMove = '';
+            for (let i = 0; i < 20; i++) {
+                let move; do { move = moves[Math.floor(Math.random() * moves.length)]; } while (move === lastMove);
+                lastMove = move;
+                scramble.push(move + modifiers[Math.floor(Math.random() * modifiers.length)]);
+            }
+            scrambleDisplay.textContent = scramble.join(' ');
+        }
+
+        function toggleTimer() { isRunning ? pauseTimer() : startTimer(); }
+        function startTimer() {
+            if (isRunning) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (isEditing) { parseInputTime(); isEditing = false; }
+            isRunning = true;
+            document.getElementById('toggleBtn').innerText = "Pause";
+            lastSecond = Math.floor(timeLeft / 1000);
+            const now = Date.now();
+            if (isCuberMode) timerStartTime = now - timeLeft; else timerEndTime = now + timeLeft;
+
+            timerInterval = setInterval(() => {
+                const now = Date.now();
+                if (isCuberMode) {
+                    timeLeft = now - timerStartTime;
+                } else {
+                    timeLeft = timerEndTime - now;
+                    if (timeLeft > 0) {
+                        const cs = Math.floor(timeLeft / 1000);
+                        if (cs < lastSecond) { playTick(); lastSecond = cs; }
+                    } else {
+                        timeLeft = 0; updateDisplay(); pauseTimer(); playAlarm();
+                    }
+                }
+                updateDisplay();
+            }, 10);
+        }
+
+        function pauseTimer() { clearInterval(timerInterval); isRunning = false; document.getElementById('toggleBtn').innerText = "Start"; }
+        function resetTimer() {
+            pauseTimer(); timeLeft = originalTime;
+            if (isCuberMode) { timeLeft = 0; lastSolveDisplay.style.display = 'none'; generateScramble(); }
+            updateDisplay(); if(timerDisplay.innerText === "") { updateDisplay(); updateLayout(); }
+        }
+
+        function toggleCuberMode() {
+            isCuberMode = cuberToggle.checked; playClick();
+            if(isCuberMode) {
+                pauseTimer(); timeLeft = 0; originalTime = 0; generateScramble();
+                scrambleDisplay.style.display = 'block'; updateDisplay();
+                timerDisplay.setAttribute('contenteditable', 'false');
+                alert("Cuber Mode:\nHold screen/space to Arm.\nRelease to Solve.");
+            } else {
+                scrambleDisplay.style.display = 'none'; lastSolveDisplay.style.display = 'none';
+                timerDisplay.setAttribute('contenteditable', 'true');
+                timeLeft = 300000; originalTime = 300000; updateDisplay();
+            }
+            updateLayout();
+        }
+
+        function toggleTitleVisibility() { updateLayout(); playClick(); }
+        function toggleMsVisibility() { updateLayout(); updateDisplay(); playClick(); }
+
+        /* --- INPUT HANDLERS --- */
+        const handleInputDown = (e) => {
+            const target = e.target;
+            const isControl = target.closest('.controls') || target.closest('.settings-panel') || target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.tagName === 'SELECT';
+            const isEditable = target.id === 'timer' || target.id === 'mainTitle';
+
+            if (document.body.classList.contains('fullscreen-mode') && !isControl && !isRunning && !isEditable) document.body.classList.toggle('show-controls');
+            
+            if (!isCuberMode || isControl || (isEditable && !isCuberMode)) return;
+
+            e.preventDefault();
+            if (isRunning) { 
+                pauseTimer(); playClick(); document.body.classList.remove('cuber-running');
+                lastSolveDisplay.innerHTML = `<span style="color:#2ecc71; font-weight:bold; font-size:1.2em;">Last: ${timerDisplay.innerText}</span><br><span style="font-size:0.8em; opacity:0.8;">${scrambleDisplay.textContent}</span>`;
+                lastSolveDisplay.style.display = 'block';
+                generateScramble(); 
+            } else { 
+                pauseTimer(); timeLeft = 0; updateDisplay(); 
+                timerDisplay.classList.add('not-ready'); 
+                holdTimeout = setTimeout(() => { timerDisplay.classList.remove('not-ready'); timerDisplay.classList.add('ready'); isArmed = true; playTick(); }, 300); 
+            }
+        };
+
+        const handleInputUp = (e) => {
+            if (!isCuberMode) return;
+            clearTimeout(holdTimeout); timerDisplay.classList.remove('not-ready');
+            if (isArmed) { timerDisplay.classList.remove('ready'); isArmed = false; startTimer(); document.body.classList.add('cuber-running'); } 
+            else { timerDisplay.classList.remove('ready'); }
+        };
+
+        // Mobile/Mouse Unified Listeners
+        document.body.addEventListener('touchstart', handleInputDown, {passive: false});
+        document.body.addEventListener('mousedown', handleInputDown);
+        document.body.addEventListener('touchend', handleInputUp);
+        document.body.addEventListener('mouseup', handleInputUp);
+
+        // Mobile focus fix
+        const forceFocus = (e) => { if(!isCuberMode) e.target.focus(); };
+        timerDisplay.addEventListener('click', forceFocus); mainTitle.addEventListener('click', forceFocus);
+
+        /* --- AUDIO --- */
+        function playTone(f, t, d, v) {
+            if (v <= 0 || audioCtx.state === 'suspended') { if(audioCtx.state === 'suspended') audioCtx.resume(); if(v<=0) return; }
+            const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+            o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
+            g.gain.setValueAtTime(v, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + d);
+            o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
+        }
+        function playClick() { playTone(800, 'sine', 0.1, volClick); }
+        function playTick() { playTone(1000, 'triangle', 0.05, volTick); }
+        function playAlarm() {
+            if (volAlarm <= 0) return;
+            if (customAlarmBuffer) {
+                const s = audioCtx.createBufferSource(), g = audioCtx.createGain();
+                s.buffer = customAlarmBuffer; g.gain.value = volAlarm;
+                s.connect(g); g.connect(audioCtx.destination); s.start(0);
+            } else { playTone(600, 'sine', 1, volAlarm); setTimeout(() => playTone(400, 'sine', 1.5, volAlarm), 400); }
+        }
+        document.getElementById('audioFile').addEventListener('change', function(e) {
+            if(e.target.files[0]) {
+                const r = new FileReader();
+                r.onload = ev => audioCtx.decodeAudioData(ev.target.result, b => { customAlarmBuffer = b; playClick(); alert("Alarm Loaded!"); });
+                r.readAsArrayBuffer(e.target.files[0]);
+            }
+        });
+
+        /* --- UI CONTROLS --- */
+        function toggleSettings() { settingsPanel.classList.toggle('hidden'); }
+        function toggleFullScreen() {
+            settingsPanel.classList.add('hidden');
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(console.log);
+            else if (document.exitFullscreen) document.exitFullscreen();
+        }
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) { document.body.classList.remove('fullscreen-mode', 'show-controls'); }
+            else { document.body.classList.add('fullscreen-mode'); document.body.classList.remove('show-controls'); }
+        });
+
+        /* --- TEXT EDITING --- */
+        timerDisplay.addEventListener('focus', () => { if(isCuberMode) { timerDisplay.blur(); return; } isEditing = true; pauseTimer(); });
+        timerDisplay.addEventListener('blur', () => { 
+            if(isCuberMode) return;
+            let txt = timerDisplay.innerText.trim();
+            if (txt === "") { updateLayout(); isEditing = false; return; }
+            let s = 0;
+            if (txt.includes(':')) { const p = txt.split(':'); s = (parseInt(p[0])||0)*60 + (parseFloat(p[1])||0); } 
+            else { s = parseFloat(txt)||0; }
+            timeLeft = Math.floor(s * 1000); originalTime = timeLeft; isEditing = false; updateDisplay(); updateLayout();
+        });
+        timerDisplay.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); timerDisplay.blur(); } });
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>            -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
         }
 
@@ -787,3 +1518,4 @@
     </script>
 </body>
 </html>
+
