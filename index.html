@@ -689,6 +689,17 @@
         
         <div class="panel-content">
             <div class="settings-section">
+                <div class="section-title">💾 Data</div>
+                <div style="display:flex; gap:5px;">
+                    <button class="main-btn" onclick="saveConfig()" style="flex:1;">Save Config</button>
+                    <label class="main-btn" style="flex:1; text-align:center; cursor:pointer;">
+                        Load Config
+                        <input type="file" id="loadConfigFile" accept=".json" onchange="loadConfig(this)" style="display:none;">
+                    </label>
+                </div>
+            </div>
+
+            <div class="settings-section">
                 <div class="section-title">≡ Layers</div>
                 <div id="layersList">
                     <div class="no-layers">No widgets added</div>
@@ -713,6 +724,9 @@
             <div class="settings-section">
                 <div class="section-title">🎨 Appearance</div>
                 <div style="margin-bottom:10px;">
+                    <label class="file-label" for="customFontFile" style="margin-bottom:5px;">🔤 Upload Custom Font</label>
+                    <input type="file" id="customFontFile" accept=".ttf, .otf, .woff, .woff2">
+                    
                     <select id="fontSelect" onchange="changeFont()">
                         <option value="'Inter', sans-serif">Modern (Inter)</option>
                         <option value="'Roboto', sans-serif">Standard (Roboto)</option>
@@ -961,8 +975,10 @@
         let isCuberMode = false, holdTimeout, isArmed = false;
         let timerEndTime = 0, timerStartTime = 0, lastSecond = 0;
         let currentBgMode = 'none', currentPatternType = 'none';
+        let currentBgDataURL = ''; // Store BG image data for save/load
         let volClick = 0.3, volTick = 0.1, volAlarm = 0.5, customAlarmBuffer = null;
         let solveHistory = []; 
+        let customFonts = []; // Array to store custom loaded fonts
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioCtx = new AudioContext();
 
@@ -1090,6 +1106,306 @@
             updateLayout(); updateDisplay();
             renderLayerList();
             updateLayerZIndices();
+        }
+
+        /* --- CUSTOM FONT SYSTEM --- */
+        document.getElementById('customFontFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                const fontName = file.name.split('.')[0]; // remove extension
+                const fontData = ev.target.result;
+                addCustomFont(fontName, fontData);
+            };
+            reader.readAsDataURL(file);
+            e.target.value = '';
+        });
+
+        async function addCustomFont(name, data, selectIt = true) {
+            try {
+                const fontFace = new FontFace(name, `url(${data})`);
+                await fontFace.load();
+                document.fonts.add(fontFace);
+                
+                // Add to array if not present (for saving)
+                if (!customFonts.some(f => f.name === name)) {
+                    customFonts.push({ name: name, src: data });
+                    
+                    // Add option to select
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.innerText = name + " (Custom)";
+                    fontSelect.appendChild(option);
+                }
+                
+                if(selectIt) {
+                    fontSelect.value = name;
+                    changeFont();
+                    showAlert(`Font "${name}" Loaded!`);
+                }
+            } catch(err) {
+                console.error(err);
+                showAlert("Failed to load font.");
+            }
+        }
+
+        /* --- SAVE & LOAD SYSTEM --- */
+        function saveConfig() {
+            // Determine current layout class
+            let layout = 'standard';
+            if (document.body.classList.contains('layout-inverted')) layout = 'inverted';
+            if (document.body.classList.contains('layout-split')) layout = 'split';
+            if (document.body.classList.contains('layout-split-rev')) layout = 'split-rev';
+
+            const config = {
+                version: 1,
+                themeColor: colorPicker.value,
+                font: fontSelect.value,
+                customFonts: customFonts, // Save loaded fonts
+                layout: layout,
+                bg: {
+                    mode: currentBgMode,
+                    pattern: currentPatternType,
+                    image: currentBgMode === 'image' ? document.body.style.backgroundImage : '',
+                    color: patColorInput.value,
+                    opacity: patOpacityInput.value,
+                    zoom: sliderZoom.value,
+                    panX: sliderPanX.value,
+                    panY: sliderPanY.value,
+                    blend: blendToggle.checked
+                },
+                modes: {
+                    cuber: isCuberMode,
+                    pomo: isPomoMode,
+                    clock: isClockMode,
+                    lyric: isLyricMode
+                },
+                pomoSettings: { work: pomoWorkTime, short: pomoShortTime, long: pomoLongTime },
+                clockCities: selectedCities,
+                audio: { click: volClick, tick: volTick, alarm: volAlarm },
+                // Save widgets. For system layer, just save basic info to mark position
+                widgets: widgets.map(w => {
+                    if (w.type === 'system') {
+                        return { type: 'system', locked: w.locked };
+                    }
+                    return {
+                        type: w.type,
+                        name: w.name,
+                        src: w.src, // DataURL for images
+                        text: w.text,
+                        color: w.color,
+                        fontSize: w.fontSize,
+                        locked: w.locked,
+                        // DOM geometry
+                        left: w.el.style.left,
+                        top: w.el.style.top,
+                        width: w.el.style.width,
+                        rotation: w.el.dataset.rotation
+                    };
+                }),
+                lyrics: lyricInput.value,
+                mainTitleText: mainTitle.innerText
+            };
+
+            const blob = new Blob([JSON.stringify(config)], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "tenshon-config.json";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showAlert("Config Saved!");
+        }
+
+        function loadConfig(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const config = JSON.parse(e.target.result);
+                    await applyConfig(config);
+                    showAlert("Config Loaded Successfully!");
+                } catch(err) {
+                    console.error(err);
+                    showAlert("Error loading config file.");
+                }
+            };
+            reader.readAsText(file);
+            input.value = ''; // Reset input
+        }
+
+        async function applyConfig(config) {
+            // Restore Theme
+            colorPicker.value = config.themeColor;
+            updateColors(config.themeColor);
+            
+            // Restore Custom Fonts first
+            if(config.customFonts) {
+                for(const f of config.customFonts) {
+                    // Check if already exists to prevent duplicates on multiple loads
+                    if (![...fontSelect.options].some(o => o.value === f.name)) {
+                         await addCustomFont(f.name, f.src, false);
+                    }
+                }
+            }
+
+            // Restore Font
+            fontSelect.value = config.font;
+            changeFont();
+
+            // Restore Layout
+            changeLayout(config.layout);
+
+            // Restore Background
+            currentBgMode = config.bg.mode;
+            currentPatternType = config.bg.pattern;
+            patColorInput.value = config.bg.color;
+            patOpacityInput.value = config.bg.opacity;
+            sliderZoom.value = config.bg.zoom;
+            sliderPanX.value = config.bg.panX;
+            sliderPanY.value = config.bg.panY;
+            blendToggle.checked = config.bg.blend;
+            
+            // Sync slider numbers
+            document.getElementById('bgZoomNum').value = config.bg.zoom;
+            document.getElementById('bgPanXNum').value = config.bg.panX;
+            document.getElementById('bgPanYNum').value = config.bg.panY;
+            document.getElementById('patOpacityNum').value = config.bg.opacity;
+
+            if (currentBgMode === 'image') {
+                document.body.classList.add('custom-image-mode');
+                document.body.style.backgroundImage = config.bg.image;
+            } else {
+                document.body.classList.remove('custom-image-mode');
+                updatePatternStyle();
+            }
+            updateBgParams();
+
+            // Restore Modes
+            // Reset all first
+            if (isCuberMode) { cuberToggle.checked = false; toggleCuberMode(); }
+            if (isPomoMode) { pomoToggle.checked = false; togglePomoMode(); }
+            if (isClockMode) { clockToggle.checked = false; toggleClockMode(); }
+            if (isLyricMode) { document.getElementById('lyricToggle').checked = false; toggleLyricMode(); }
+
+            // Apply new
+            if (config.modes.cuber) { cuberToggle.checked = true; toggleCuberMode(); }
+            if (config.modes.pomo) { 
+                pomoToggle.checked = true; 
+                pomoWorkInput.value = config.pomoSettings.work;
+                pomoShortInput.value = config.pomoSettings.short;
+                pomoLongInput.value = config.pomoSettings.long;
+                togglePomoMode();
+            }
+            if (config.modes.clock) { 
+                clockToggle.checked = true; 
+                selectedCities = config.clockCities || selectedCities;
+                // Update checkboxes
+                document.querySelectorAll('.city-check').forEach(cb => cb.checked = selectedCities.includes(cb.value));
+                toggleClockMode(); 
+            }
+            
+            // Restore Lyrics
+            lyricInput.value = config.lyrics || '';
+            if (config.modes.lyric) { 
+                document.getElementById('lyricToggle').checked = true; 
+                toggleLyricMode();
+            }
+            
+            if (!config.modes.lyric && config.mainTitleText) {
+                mainTitle.innerText = config.mainTitleText;
+            }
+
+            // Restore Audio Settings
+            volClick = config.audio.click; document.getElementById('volClickRange').value = volClick*100;
+            volTick = config.audio.tick; document.getElementById('volTickRange').value = volTick*100;
+            volAlarm = config.audio.alarm; document.getElementById('volAlarmRange').value = volAlarm*100;
+
+            // Restore Widgets
+            // 1. Clear existing user widgets (this removes elements)
+            // But we need to be careful not to kill the system layer element if we are going to reuse it.
+            // Actually, better to rebuild the array entirely.
+            
+            const systemEl = document.getElementById('mainContainer'); // Reference
+            widgetLayer.innerHTML = ''; // Clears all user widgets
+            widgets = []; // Clear array
+
+            config.widgets.forEach(w => {
+                if (w.type === 'system') {
+                    // Restore system layer object
+                    widgets.push({ id: 'system-ui', type: 'system', name: '⏱️ Timer & Title', fixed: true, locked: w.locked });
+                    if(w.locked) systemEl.classList.add('locked'); else systemEl.classList.remove('locked');
+                } else {
+                    // Create new widget
+                    restoreWidget(w);
+                }
+            });
+            
+            updateLayerZIndices();
+            renderLayerList();
+            playClick();
+        }
+
+        function restoreWidget(data) {
+            const id = Date.now().toString() + Math.random().toString(16).slice(2);
+            const widget = document.createElement('div');
+            widget.className = 'widget';
+            widget.id = 'w-' + id;
+            
+            // Apply saved styles
+            widget.style.left = data.left;
+            widget.style.top = data.top;
+            widget.style.width = data.width;
+            widget.dataset.rotation = data.rotation;
+            widget.style.transform = `translate(-50%, -50%) rotate(${data.rotation}deg)`; // Assuming centered anchor logic
+            // Note: In createWidget we set initial transform differently, but here we assume 'translate(-50%, -50%)' logic for subsequent moves.
+            // Let's normalize: Move logic uses offsetLeft/Top directly. The initial transform in createWidget was just for random placement.
+            // The handleWidgetMove updates left/top style.
+            // Rotation is applied via transform.
+            // We need to apply rotation transform.
+            
+            if(data.locked) widget.classList.add('locked');
+
+            let innerHTML = '';
+            if (data.type === 'image') {
+                innerHTML = `<img src="${data.src}" draggable="false">`;
+            } else if (data.type === 'text') {
+                innerHTML = `<div class="widget-text-content" style="color: ${data.color}; font-size: ${data.fontSize}px;">${data.text}</div>`;
+            }
+
+            innerHTML += `
+                <div class="widget-controls">
+                    <div class="w-handle w-delete">✕</div>
+                    <div class="w-handle w-rotate"></div>
+                    <div class="w-handle w-resize"></div>
+                </div>
+            `;
+            widget.innerHTML = innerHTML;
+            
+            // Re-bind double click
+            widget.ondblclick = (e) => {
+                e.stopPropagation(); 
+                if(data.type === 'text') enterTextEditMode(id);
+            };
+
+            widgetLayer.appendChild(widget);
+            
+            widgets.push({ 
+                id: id, 
+                el: widget, 
+                type: data.type, 
+                name: data.name, 
+                src: data.src, 
+                text: data.text, 
+                color: data.color, 
+                fontSize: data.fontSize, 
+                locked: data.locked 
+            });
         }
 
         /* --- WIDGET SYSTEM --- */
