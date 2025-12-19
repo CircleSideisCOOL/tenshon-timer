@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <title>Tenshon Timer</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Caveat&family=Inter:wght@400;800&family=JetBrains+Mono:wght@700&family=Lobster&family=Orbitron:wght@700&family=Oswald:wght@500&family=Pacifico&family=Playfair+Display:wght@700&family=Press+Start+2P&family=Roboto:wght@400;700&display=swap');
@@ -17,6 +18,7 @@
             --accent: #3498db;
             --bg-blend: overlay;
             --current-font: 'Inter', sans-serif;
+            --guide-color: #ff00ff;
         }
 
         body {
@@ -44,15 +46,146 @@
         body.custom-image-mode { background-repeat: no-repeat !important; }
 
         .container {
-            position: relative;
-            z-index: 1;
+            position: absolute;
+            top: 0; left: 0;
+            z-index: 50; /* Default high, managed by JS now */
             width: 100%;
             height: 100%;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            transition: gap 0.3s ease;
+            pointer-events: none; /* Allows clicking through empty space */
         }
+        
+        .container > * { pointer-events: auto; }
+        
+        /* LOCK LOGIC FOR CONTAINER */
+        .container.locked > * { pointer-events: none !important; }
+
+        /* --- LAYOUT MODES --- */
+        body.layout-inverted .container { flex-direction: column-reverse; }
+        
+        body.layout-split .container { flex-direction: row; gap: 5vw; padding: 0 5vw; box-sizing: border-box;}
+        body.layout-split .timer-display { font-size: 15vw; }
+        body.layout-split h1 { text-align: right; }
+        
+        body.layout-split-rev .container { flex-direction: row-reverse; gap: 5vw; padding: 0 5vw; box-sizing: border-box;}
+        body.layout-split-rev .timer-display { font-size: 15vw; }
+        body.layout-split-rev h1 { text-align: left; }
+
+        @media (max-width: 768px) {
+            body.layout-split .container, body.layout-split-rev .container { 
+                flex-direction: column !important; 
+                gap: 0;
+            }
+            body.layout-split .timer-display, body.layout-split-rev .timer-display { 
+                font-size: 22vw; 
+            }
+            body.layout-split h1, body.layout-split-rev h1 { text-align: center; }
+        }
+
+        /* --- WIDGET LAYER --- */
+        #widgetLayer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: auto; 
+            pointer-events: none; 
+            overflow: hidden;
+        }
+
+        .widget {
+            position: absolute;
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+            transform-origin: center center;
+            display: flex; justify-content: center; align-items: center;
+            pointer-events: auto; 
+            box-sizing: border-box;
+            min-width: 20px; min-height: 20px;
+        }
+        .widget:active { cursor: grabbing; }
+        
+        /* LOCKED WIDGET STYLE */
+        .widget.locked { pointer-events: none !important; }
+
+        .widget img {
+            width: 100%; height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            display: block;
+        }
+
+        .widget-text-content {
+            font-size: 50px; /* Base size, overridden by JS */
+            white-space: pre-wrap; /* Allow multiline and wrapping */
+            font-weight: bold;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            pointer-events: none;
+            line-height: 1;
+            outline: none;
+            min-width: 30px;
+        }
+        
+        /* EDIT MODE STYLES */
+        .widget-text-content[contenteditable="true"] {
+            pointer-events: auto;
+            cursor: text;
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+            padding: 2px 5px;
+            border: 1px dashed rgba(255,255,255,0.5);
+        }
+
+        .widget.active { outline: 2px dashed rgba(255,255,255,0.8); }
+        
+        .widget-controls {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: none;
+        }
+        .widget.active .widget-controls { display: block; }
+
+        .w-handle {
+            position: absolute; width: 20px; height: 20px;
+            background: #3498db; border: 2px solid #fff; border-radius: 50%;
+            pointer-events: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 30;
+        }
+        
+        .w-resize { bottom: -10px; right: -10px; cursor: nwse-resize; }
+        
+        .w-rotate {
+            top: -30px; left: 50%; transform: translateX(-50%);
+            background: #2ecc71; cursor: grab;
+        }
+        .w-rotate:active { cursor: grabbing; }
+        .w-rotate::after {
+            content: ''; position: absolute; top: 20px; left: 8px;
+            width: 2px; height: 10px; background: rgba(255,255,255,0.5);
+        }
+
+        .w-delete {
+            position: absolute; top: -10px; left: -10px;
+            width: 20px; height: 20px;
+            background: #e74c3c; color: white; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 14px; font-weight: bold; cursor: pointer;
+            pointer-events: auto; border: 2px solid #fff;
+        }
+
+        /* --- SNAP GUIDES --- */
+        .guide-line {
+            position: absolute;
+            background-color: var(--guide-color);
+            display: none;
+            pointer-events: none;
+            z-index: 9999; /* Always on top */
+            box-shadow: 0 0 5px var(--guide-color);
+        }
+        .guide-v { width: 1px; height: 100%; top: 0; left: 50%; transform: translateX(-50%); }
+        .guide-h { height: 1px; width: 100%; top: 50%; left: 0; transform: translateY(-50%); }
 
         /* --- ELECTRICITY ANIMATION --- */
         @keyframes electric-change {
@@ -260,7 +393,7 @@
             transition: none !important;
         }
 
-        .timer-display.ms-mode { font-size: 14vw !important; }
+        .timer-display.ms-mode { font-size: 14vw; }
 
         body.retro-mode h1 { font-size: 3vw !important; }
         body.retro-mode .timer-display { font-size: 15vw !important; letter-spacing: -2px; }
@@ -343,7 +476,7 @@
             display: flex; align-items: center; gap: 5px;
         }
 
-        select, .custom-file-upload, textarea, input[type="number"] {
+        select, .custom-file-upload, textarea, input[type="number"], input[type="text"] {
             width: 100%; padding: 8px; border-radius: 6px;
             border: 1px solid rgba(128,128,128,0.5); 
             background: var(--input-bg); 
@@ -410,6 +543,16 @@
         .pat-check { background-image: url('data:image/svg+xml;utf8,<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="10" height="10" fill="white" opacity="0.5"/><rect x="10" y="10" width="10" height="10" fill="white" opacity="0.5"/></svg>'); }
         .pat-zig { background-image: url('data:image/svg+xml;utf8,<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg"><path d="M0 0 L10 10 L20 0 L20 5 L10 15 L0 5 Z" fill="white" opacity="0.6"/></svg>'); }
 
+        /* Layout Buttons */
+        .layout-btn {
+            height: 40px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2);
+            cursor: pointer; transition: transform 0.1s, border-color 0.2s;
+            background: rgba(0,0,0,0.3); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px;
+        }
+        .layout-btn:hover { transform: scale(1.02); border-color: var(--accent); }
+        .l-box { background: rgba(255,255,255,0.8); width: 15px; height: 6px; border-radius: 1px; }
+        .l-line { background: rgba(255,255,255,0.4); width: 20px; height: 2px; border-radius: 1px; }
+
         input[type="file"] { display: none; }
         .file-label {
             display: block; width: 100%; text-align: center; padding: 8px; 
@@ -418,6 +561,10 @@
             border: 1px solid rgba(128,128,128,0.2);
         }
         .file-label:hover { background: rgba(128,128,128,0.2); }
+        .btn-delete { background: #e74c3c; color: #fff; margin-top:5px; border:none; padding:8px; border-radius:6px; cursor:pointer; width:100%; font-weight:bold; }
+        .btn-delete:hover { background: #c0392b; }
+        .btn-add-text { background: #9b59b6; color: #fff; border:none; padding:8px; border-radius:6px; cursor:pointer; width:100%; font-weight:bold; }
+        .btn-add-text:hover { background: #8e44ad; }
 
         .audio-actions { display: flex; gap: 5px; margin-top: 5px; }
         .audio-btn { flex: 1; padding: 6px; font-size: 0.75rem; border-radius: 4px; border:none; cursor: pointer; font-weight: bold; opacity: 0.8; transition: opacity 0.2s;}
@@ -466,11 +613,51 @@
             background: rgba(255,255,255,0.1); color: inherit; border: 1px solid rgba(128,128,128,0.5);
             padding: 8px 20px; border-radius: 10px; cursor: pointer; font-weight: bold; align-self: center;
         }
+
+        /* --- LAYERS PANEL STYLES --- */
+        #layersList {
+            display: flex; flex-direction: column; gap: 5px;
+            max-height: 200px; overflow-y: auto; padding: 5px;
+            background: rgba(0,0,0,0.2); border-radius: 6px;
+        }
+        .layer-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 5px 10px; background: rgba(255,255,255,0.05);
+            border-radius: 4px; cursor: pointer; transition: background 0.2s;
+            border: 1px solid transparent;
+        }
+        .layer-item:hover { background: rgba(255,255,255,0.1); }
+        .layer-item.active-layer { border-color: var(--accent); background: rgba(255,255,255,0.15); }
+        .layer-item.system-layer { background: rgba(52, 152, 219, 0.2); }
+        
+        .layer-thumb { width: 30px; height: 30px; object-fit: cover; border-radius: 4px; background: #000; }
+        .layer-icon-text { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: #555; border-radius: 4px; font-size: 1.2rem; }
+        .layer-name { flex-grow: 1; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+        
+        .layer-controls { display: flex; gap: 2px; }
+        .layer-btn { 
+            background: none; border: 1px solid rgba(255,255,255,0.2); color: inherit; 
+            width: 24px; height: 24px; border-radius: 4px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 0.7rem;
+        }
+        .layer-btn:hover { background: rgba(255,255,255,0.2); }
+        .layer-btn.btn-del-layer:hover { background: #e74c3c; border-color: #e74c3c; }
+        
+        .layer-btn.locked { color: #e74c3c; }
+
+        .no-layers { font-size: 0.8rem; opacity: 0.5; padding: 10px; text-align: center; }
+        
+        #activeWidgetSettings { display: none; margin-top: 10px; border-top: 1px solid rgba(128,128,128,0.2); padding-top: 10px; }
     </style>
 </head>
 <body>
 
-    <div class="container">
+    <div id="widgetLayer"></div>
+
+    <div id="guide-v" class="guide-line guide-v"></div>
+    <div id="guide-h" class="guide-line guide-h"></div>
+
+    <div class="container" id="mainContainer">
         <div id="pomoStatus" class="pomo-status">💪 FOCUS MODE</div>
         
         <div id="scrambleDisplay" class="scramble-display"></div>
@@ -502,6 +689,28 @@
         
         <div class="panel-content">
             <div class="settings-section">
+                <div class="section-title">≡ Layers</div>
+                <div id="layersList">
+                    <div class="no-layers">No widgets added</div>
+                </div>
+                
+                <div id="activeWidgetSettings">
+                    <div class="section-title">Widget Settings</div>
+                    <div id="textWidgetControls">
+                        <input type="text" id="widgetTextInput" placeholder="Edit Text" oninput="updateActiveWidgetText()" style="margin-bottom:5px;">
+                        <div class="slider-group">
+                            <label>Size</label>
+                            <input type="range" id="widgetSizeInput" min="10" max="300" oninput="updateActiveWidgetSize()">
+                        </div>
+                        <div class="slider-group">
+                            <label>Color</label>
+                            <input type="color" id="widgetColorInput" oninput="updateActiveWidgetColor()" style="width:100%; height:30px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
                 <div class="section-title">🎨 Appearance</div>
                 <div style="margin-bottom:10px;">
                     <select id="fontSelect" onchange="changeFont()">
@@ -527,7 +736,49 @@
             </div>
 
             <div class="settings-section">
-                <div class="section-title">🖼️ Background</div>
+                <div class="section-title">📐 Layout</div>
+                <div class="pattern-grid" style="grid-template-columns: repeat(4, 1fr);">
+                    <div class="layout-btn" onclick="changeLayout('standard')" title="Standard (Text Top)">
+                        <div class="l-line" style="width:15px"></div>
+                        <div class="l-box"></div>
+                    </div>
+                    <div class="layout-btn" onclick="changeLayout('inverted')" title="Inverted (Timer Top)">
+                        <div class="l-box"></div>
+                        <div class="l-line" style="width:15px"></div>
+                    </div>
+                    <div class="layout-btn" onclick="changeLayout('split')" title="Split (Text Left)">
+                        <div style="display:flex; gap:2px; align-items:center;">
+                            <div class="l-line" style="width:5px; height:10px;"></div>
+                            <div class="l-box" style="width:10px; height:10px;"></div>
+                        </div>
+                    </div>
+                    <div class="layout-btn" onclick="changeLayout('split-rev')" title="Split (Timer Left)">
+                        <div style="display:flex; gap:2px; align-items:center;">
+                            <div class="l-box" style="width:10px; height:10px;"></div>
+                            <div class="l-line" style="width:5px; height:10px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="section-title">🖼️ Background & Widgets</div>
+                
+                <div style="display:flex; flex-direction:column; gap:5px; margin-top:5px;">
+                    <div style="display:flex; gap:5px;">
+                         <button class="btn-add-text" onclick="addTextWidget()">➕ Add Text Widget</button>
+                    </div>
+                    <div style="display:flex; gap:5px;">
+                        <label class="file-label" for="widgetImageFile">➕ Add Image Widget</label>
+                        <input type="file" id="widgetImageFile" accept="image/*">
+                    </div>
+                </div>
+                <div class="toggle-row" onclick="document.getElementById('snapToggle').click()">
+                    <label>🧲 Snap to Grid</label> <input type="checkbox" id="snapToggle" checked onclick="event.stopPropagation()">
+                </div>
+                <button class="btn-delete" onclick="clearAllWidgets()">🗑️ Clear All Widgets</button>
+
+                <div class="section-title" style="margin-top:10px;">Background Pattern</div>
                 <div class="pattern-grid">
                     <div class="pattern-btn pat-none" onclick="selectPattern('none')" title="None"></div>
                     <div class="pattern-btn pat-dots" onclick="selectPattern('dots')" title="Dots"></div>
@@ -548,8 +799,8 @@
                 </div>
 
                 <div style="display:flex; gap:5px; margin-top:5px;">
-                     <label class="file-label" for="bgImageFile">Upload Image</label>
-                     <input type="file" id="bgImageFile" accept="image/*">
+                      <label class="file-label" for="bgImageFile">Set BG Image</label>
+                      <input type="file" id="bgImageFile" accept="image/*">
                 </div>
                 
                 <div class="section-title" style="margin-top:10px;">Position</div>
@@ -711,7 +962,7 @@
         let timerEndTime = 0, timerStartTime = 0, lastSecond = 0;
         let currentBgMode = 'none', currentPatternType = 'none';
         let volClick = 0.3, volTick = 0.1, volAlarm = 0.5, customAlarmBuffer = null;
-        let solveHistory = []; // STORE SOLVE HISTORY
+        let solveHistory = []; 
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioCtx = new AudioContext();
 
@@ -751,17 +1002,28 @@
         let alarmTimeout, alarmInterval, activeAlarmSource;
         let audioDuration = 0;
 
+        // WIDGET VARS
+        let widgets = []; // Array to store widget objects {id, el, src, type, etc}
+        let activeWidgetId = null;
+        let isDraggingWidget = false, isResizingWidget = false, isRotatingWidget = false;
+        let startX, startY, startWidth, startHeight, startRotation, startCenterX, startCenterY;
+
         // Elements
+        const mainContainer = document.getElementById('mainContainer');
         const timerDisplay = document.getElementById('timer');
         const mainTitle = document.getElementById('mainTitle');
         const scrambleDisplay = document.getElementById('scrambleDisplay');
-        const lastSolveDisplay = document.getElementById('lastSolve'); // Kept for legacy ref, mostly unused now
-        const statsDisplay = document.getElementById('statsDisplay'); // NEW CONTAINER
+        const statsDisplay = document.getElementById('statsDisplay'); 
         const settingsPanel = document.getElementById('settingsPanel');
         const panelHeader = document.getElementById('panelHeader');
         const customAlert = document.getElementById('customAlert');
         const alertMsg = document.getElementById('alertMsg');
         const pomoStatus = document.getElementById('pomoStatus');
+        const widgetLayer = document.getElementById('widgetLayer');
+        const guideV = document.getElementById('guide-v');
+        const guideH = document.getElementById('guide-h');
+        const snapToggle = document.getElementById('snapToggle');
+        const layersList = document.getElementById('layersList');
         
         const worldClockContainer = document.getElementById('worldClockContainer');
         const localTimeDisplay = document.getElementById('localTime');
@@ -813,10 +1075,518 @@
         const trimStartVal = document.getElementById('trimStartVal');
         const trimDurVal = document.getElementById('trimDurVal');
 
+        // Widget Settings Inputs
+        const activeWidgetSettings = document.getElementById('activeWidgetSettings');
+        const widgetTextInput = document.getElementById('widgetTextInput');
+        const widgetSizeInput = document.getElementById('widgetSizeInput');
+        const widgetColorInput = document.getElementById('widgetColorInput');
+
         function init() {
             updateColors(colorPicker.value);
+            // Add System Layer
+            widgets.push({ id: 'system-ui', type: 'system', name: '⏱️ Timer & Title', fixed: true, locked: false });
+            
             if(cuberToggle.checked) { isCuberMode = true; timerDisplay.setAttribute('contenteditable', 'false'); scrambleDisplay.style.display = 'block'; generateScramble(); }
             updateLayout(); updateDisplay();
+            renderLayerList();
+            updateLayerZIndices();
+        }
+
+        /* --- WIDGET SYSTEM --- */
+        document.getElementById('widgetImageFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                createWidget('image', ev.target.result, file.name);
+                showAlert("Image Added!<br>Check Layers Tab.");
+                playClick();
+            };
+            reader.readAsDataURL(file);
+            e.target.value = ''; 
+        });
+
+        function addTextWidget() {
+            createWidget('text', 'New Text', 'Text Widget');
+            showAlert("Text Added!");
+            playClick();
+        }
+
+        function createWidget(type, content, name) {
+            const id = Date.now().toString(); // Simple Unique ID
+            const widget = document.createElement('div');
+            widget.className = 'widget';
+            widget.id = 'w-' + id;
+            widget.style.left = '50%';
+            widget.style.top = '50%';
+            widget.dataset.rotation = '0';
+            
+            const offsetX = (Math.random() - 0.5) * 100;
+            const offsetY = (Math.random() - 0.5) * 100;
+            widget.style.transform = `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px)) rotate(0deg)`;
+
+            let innerHTML = '';
+            // Default properties
+            let props = { type: type, name: name || 'Widget', locked: false };
+
+            if (type === 'image') {
+                widget.style.width = '200px';
+                innerHTML = `<img src="${content}" draggable="false">`;
+                props.src = content;
+            } else if (type === 'text') {
+                widget.style.width = 'max-content'; // CHANGED: Was 'auto'. Prevents wrapping at screen edge.
+                widget.style.minWidth = '50px';
+                innerHTML = `<div class="widget-text-content" style="color: #ffffff; font-size: 50px;">${content}</div>`;
+                props.text = content;
+                props.color = '#ffffff';
+                props.fontSize = 50;
+            }
+
+            innerHTML += `
+                <div class="widget-controls">
+                    <div class="w-handle w-delete">✕</div>
+                    <div class="w-handle w-rotate"></div>
+                    <div class="w-handle w-resize"></div>
+                </div>
+            `;
+            widget.innerHTML = innerHTML;
+            
+            // Add Double Click to Edit
+            widget.ondblclick = (e) => {
+                e.stopPropagation(); 
+                if(type === 'text') enterTextEditMode(id);
+            };
+            
+            widgetLayer.appendChild(widget);
+            
+            // Add to data array (Newest is Top = End of Array)
+            widgets.push({ id: id, el: widget, ...props });
+            
+            updateLayerZIndices();
+            renderLayerList();
+            activateWidgetId(id);
+        }
+        
+        function enterTextEditMode(id) {
+            const wObj = widgets.find(w => w.id === id);
+            if (!wObj || wObj.type !== 'text' || wObj.locked) return;
+
+            const textEl = wObj.el.querySelector('.widget-text-content');
+            if (!textEl) return;
+
+            textEl.contentEditable = "true";
+            textEl.focus();
+            
+            // Select all text
+            const range = document.createRange();
+            range.selectNodeContents(textEl);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+
+            // Save handlers to remove later if needed, or just overwrite properties
+            textEl.onblur = function() {
+                this.contentEditable = "false";
+                wObj.text = this.innerText; // Sync data
+                if(activeWidgetId === id) widgetTextInput.value = wObj.text; // Sync settings panel
+                window.getSelection().removeAllRanges();
+            };
+            
+            textEl.onkeydown = function(e) {
+                e.stopPropagation(); // Prevent global hotkeys while typing
+            };
+            
+            textEl.oninput = function() {
+                wObj.text = this.innerText; // Live sync
+            };
+        }
+
+        function updateLayerZIndices() {
+            // Apply z-index based on array order (0 is bottom, length-1 is top)
+            // Base Z is 10
+            widgets.forEach((w, index) => {
+                if (w.type === 'system') {
+                    mainContainer.style.zIndex = 10 + index;
+                } else {
+                    w.el.style.zIndex = 10 + index; 
+                }
+            });
+        }
+
+        function renderLayerList() {
+            layersList.innerHTML = '';
+            if (widgets.length === 0) {
+                layersList.innerHTML = '<div class="no-layers">No widgets added</div>';
+                activeWidgetSettings.style.display = 'none';
+                return;
+            }
+
+            // Render list in REVERSE order (Top layer first in UI)
+            const reversed = [...widgets].reverse();
+            
+            reversed.forEach((w, revIndex) => {
+                // Real index in original array
+                const realIndex = widgets.length - 1 - revIndex; 
+                
+                const item = document.createElement('div');
+                item.className = 'layer-item';
+                if(w.id === activeWidgetId) item.classList.add('active-layer');
+                if(w.type === 'system') item.classList.add('system-layer');
+                
+                let thumbHTML = '';
+                if(w.type === 'image') {
+                    thumbHTML = `<img src="${w.src}" class="layer-thumb">`;
+                } else if (w.type === 'text') {
+                    thumbHTML = `<div class="layer-icon-text">T</div>`;
+                } else if (w.type === 'system') {
+                    thumbHTML = `<div class="layer-icon-text">⏱️</div>`;
+                }
+
+                const lockIcon = w.locked ? '🔒' : '🔓';
+                const lockClass = w.locked ? 'locked' : '';
+                
+                let controlsHTML = `
+                    <button class="layer-btn ${lockClass}" onclick="toggleWidgetLock('${w.id}')" title="Lock/Unlock">${lockIcon}</button>
+                `;
+
+                if(!w.locked) {
+                    controlsHTML += `
+                        <button class="layer-btn" onclick="moveLayer(${realIndex}, 1)" title="Bring Forward">↑</button>
+                        <button class="layer-btn" onclick="moveLayer(${realIndex}, -1)" title="Send Backward">↓</button>
+                    `;
+                    
+                    if(w.type !== 'system') {
+                        controlsHTML += `<button class="layer-btn btn-del-layer" onclick="deleteWidgetById('${w.id}')" title="Delete">✕</button>`;
+                    }
+                }
+
+                item.innerHTML = `
+                    ${thumbHTML}
+                    <div class="layer-name">${w.name}</div>
+                    <div class="layer-controls">
+                        ${controlsHTML}
+                    </div>
+                `;
+                
+                // Click to select
+                item.addEventListener('click', (e) => {
+                    if(e.target.closest('.layer-btn')) return; // Ignore buttons
+                    if(w.type !== 'system' && !w.locked) activateWidgetId(w.id);
+                });
+
+                layersList.appendChild(item);
+            });
+        }
+
+        function toggleWidgetLock(id) {
+            const w = widgets.find(x => x.id === id);
+            if(!w) return;
+            w.locked = !w.locked;
+            
+            if (w.type === 'system') {
+                const container = document.getElementById('mainContainer');
+                if(w.locked) container.classList.add('locked');
+                else container.classList.remove('locked');
+            } else {
+                if(w.locked) {
+                    w.el.classList.add('locked');
+                    if(activeWidgetId === id) activateWidgetId(null); // Deselect if active
+                } else {
+                    w.el.classList.remove('locked');
+                }
+            }
+            renderLayerList();
+            playClick();
+        }
+
+        function moveLayer(index, direction) {
+            // direction 1 = up (forward), -1 = down (backward)
+            const newIndex = index + direction;
+            
+            if (newIndex >= 0 && newIndex < widgets.length) {
+                // Swap
+                const temp = widgets[index];
+                widgets[index] = widgets[newIndex];
+                widgets[newIndex] = temp;
+                
+                updateLayerZIndices();
+                renderLayerList();
+                playClick();
+            }
+        }
+
+        function deleteWidgetById(id) {
+            const index = widgets.findIndex(w => w.id === id);
+            if (index > -1) {
+                const w = widgets[index];
+                if(w.type === 'system' || w.locked) return; // Cannot delete system or locked
+                
+                w.el.remove();
+                widgets.splice(index, 1);
+                if (activeWidgetId === id) activateWidgetId(null);
+                renderLayerList();
+                playClick();
+            }
+        }
+
+        function clearAllWidgets() {
+            // Remove everything EXCEPT system layer
+            widgets = widgets.filter(w => {
+                if(w.type === 'system') return true;
+                if(w.locked) return true; // Don't clear locked widgets? Or maybe clear all? Standard is clear all usually unlocks or deletes. Let's delete unless locked for safety.
+                w.el.remove();
+                return false;
+            });
+            activeWidgetId = null;
+            renderLayerList();
+            updateLayerZIndices(); // Reset Z of system layer
+            playClick();
+            showAlert("Unlocked widgets cleared.");
+        }
+
+        function activateWidgetId(id) {
+            // Deactivate visual
+            document.querySelectorAll('.widget').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.layer-item').forEach(el => el.classList.remove('active-layer'));
+            
+            activeWidgetId = id;
+            
+            if (id) {
+                const wObj = widgets.find(w => w.id === id);
+                if(wObj && wObj.type !== 'system' && !wObj.locked) {
+                    wObj.el.classList.add('active');
+                    renderLayerList(); // Re-render to show active class in list
+                    
+                    // Show settings if it's text
+                    if(wObj.type === 'text') {
+                        activeWidgetSettings.style.display = 'block';
+                        widgetTextInput.value = wObj.text;
+                        widgetColorInput.value = wObj.color;
+                        widgetSizeInput.value = wObj.fontSize;
+                    } else {
+                        activeWidgetSettings.style.display = 'none';
+                    }
+                }
+            } else {
+                activeWidgetSettings.style.display = 'none';
+            }
+        }
+
+        // --- Active Widget Controls ---
+        function updateActiveWidgetText() {
+            if(!activeWidgetId) return;
+            const wObj = widgets.find(w => w.id === activeWidgetId);
+            if(wObj && wObj.type === 'text') {
+                const val = widgetTextInput.value;
+                wObj.text = val;
+                wObj.el.querySelector('.widget-text-content').innerText = val;
+            }
+        }
+        function updateActiveWidgetSize() {
+            if(!activeWidgetId) return;
+            const wObj = widgets.find(w => w.id === activeWidgetId);
+            if(wObj && wObj.type === 'text') {
+                const val = widgetSizeInput.value;
+                wObj.fontSize = val;
+                wObj.el.querySelector('.widget-text-content').style.fontSize = val + 'px';
+            }
+        }
+        function updateActiveWidgetColor() {
+            if(!activeWidgetId) return;
+            const wObj = widgets.find(w => w.id === activeWidgetId);
+            if(wObj && wObj.type === 'text') {
+                const val = widgetColorInput.value;
+                wObj.color = val;
+                wObj.el.querySelector('.widget-text-content').style.color = val;
+            }
+        }
+
+
+        // Global Widget Event Listeners
+        document.addEventListener('mousedown', handleWidgetStart);
+        document.addEventListener('touchstart', handleWidgetStart, {passive: false});
+        
+        document.addEventListener('mousemove', handleWidgetMove);
+        document.addEventListener('touchmove', handleWidgetMove, {passive: false});
+        
+        document.addEventListener('mouseup', handleWidgetEnd);
+        document.addEventListener('touchend', handleWidgetEnd);
+
+        function handleWidgetStart(e) {
+            if (e.target.closest('.settings-panel') || e.target.closest('.controls')) return;
+            
+            // ALLOW TEXT SELECTION / EDITING
+            if (e.target.isContentEditable) return;
+
+            const target = e.target;
+            const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+            const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+
+            // 1. DELETE
+            if (target.classList.contains('w-delete')) {
+                playClick();
+                const widget = target.closest('.widget');
+                deleteWidgetById(widget.id.replace('w-', ''));
+                return;
+            }
+
+            // 2. ROTATE
+            if (target.classList.contains('w-rotate')) {
+                e.preventDefault();
+                isRotatingWidget = true;
+                const widget = target.closest('.widget');
+                const rect = widget.getBoundingClientRect();
+                startCenterX = rect.left + rect.width / 2;
+                startCenterY = rect.top + rect.height / 2;
+                startRotation = parseFloat(widget.dataset.rotation) || 0;
+                const dx = clientX - startCenterX;
+                const dy = clientY - startCenterY;
+                startRotation -= Math.atan2(dy, dx) * (180 / Math.PI) + 90; 
+                return;
+            }
+
+            // 3. RESIZE
+            if (target.classList.contains('w-resize')) {
+                e.preventDefault();
+                isResizingWidget = true;
+                const widget = target.closest('.widget');
+                const rect = widget.getBoundingClientRect();
+                startCenterX = rect.left + rect.width / 2;
+                startCenterY = rect.top + rect.height / 2;
+                const dx = clientX - startCenterX;
+                const dy = clientY - startCenterY;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                startWidth = parseFloat(widget.style.width) || rect.width;
+                startHeight = startWidth / dist; 
+                return;
+            }
+
+            // 4. DRAG / SELECT
+            const widget = target.closest('.widget');
+            if (widget) {
+                const id = widget.id.replace('w-', '');
+                const wObj = widgets.find(w => w.id === id);
+                if(wObj && wObj.locked) return; // Ignore locked widgets
+
+                activateWidgetId(id);
+                isDraggingWidget = true;
+                startX = clientX;
+                startY = clientY;
+                return;
+            } else {
+                // Clicked background, deselect
+                if(!isDraggingWidget && !isResizingWidget && !isRotatingWidget) {
+                    activateWidgetId(null);
+                }
+            }
+        }
+
+        function handleWidgetMove(e) {
+            if (!activeWidgetId) return;
+            const widget = document.getElementById('w-' + activeWidgetId);
+            if (!widget) return;
+
+            const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+            const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+
+            if (isDraggingWidget) {
+                e.preventDefault();
+                let dx = clientX - startX;
+                let dy = clientY - startY;
+                
+                let newLeft = widget.offsetLeft + dx;
+                let newTop = widget.offsetTop + dy;
+                
+                // SNAP LOGIC
+                if (snapToggle.checked) {
+                    const snapThreshold = 10;
+                    const centerX = window.innerWidth / 2;
+                    const centerY = window.innerHeight / 2;
+                    
+                    // Snap Vertical (X axis center)
+                    if (Math.abs(newLeft - centerX) < snapThreshold) {
+                        newLeft = centerX;
+                        guideV.style.display = 'block';
+                    } else {
+                        guideV.style.display = 'none';
+                    }
+                    
+                    // Snap Horizontal (Y axis center)
+                    if (Math.abs(newTop - centerY) < snapThreshold) {
+                        newTop = centerY;
+                        guideH.style.display = 'block';
+                    } else {
+                        guideH.style.display = 'none';
+                    }
+                } else {
+                    guideV.style.display = 'none';
+                    guideH.style.display = 'none';
+                }
+
+                widget.style.left = newLeft + 'px';
+                widget.style.top = newTop + 'px';
+                
+                startX = clientX;
+                startY = clientY;
+
+            } else if (isRotatingWidget) {
+                e.preventDefault();
+                const dx = clientX - startCenterX;
+                const dy = clientY - startCenterY;
+                const angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90; 
+                const finalAngle = angle + startRotation;
+                widget.dataset.rotation = finalAngle;
+                widget.style.transform = `translate(-50%, -50%) rotate(${finalAngle}deg)`;
+            } else if (isResizingWidget) {
+                e.preventDefault();
+                const dx = clientX - startCenterX;
+                const dy = clientY - startCenterY;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                let newWidth = dist * 2; 
+                if (newWidth < 20) newWidth = 20; 
+                
+                // For images we change width, for text we might rely on font size control in panel
+                // But for consistency let's allow width change for container which wraps text
+                // However, standard text scaling is best done via font-size.
+                // If it's an image, resize width.
+                const wObj = widgets.find(w => w.id === activeWidgetId);
+                if(wObj.type === 'image') {
+                     widget.style.width = newWidth + 'px';
+                } else {
+                     // For text, resizing the box via handle feels weird if text doesn't scale.
+                     // Let's scale font size based on drag distance?
+                     // Or just update width? Updating width for text just changes wrapping.
+                     // Let's stick to width for container, user can use panel for font size.
+                     widget.style.width = newWidth + 'px';
+                }
+            }
+        }
+
+        function handleWidgetEnd() {
+            isDraggingWidget = false;
+            isRotatingWidget = false;
+            isResizingWidget = false;
+            guideV.style.display = 'none';
+            guideH.style.display = 'none';
+        }
+
+        /* --- LAYOUT SWITCHER --- */
+        function changeLayout(mode) {
+            playClick();
+            document.body.classList.remove('layout-standard', 'layout-inverted', 'layout-split', 'layout-split-rev');
+            
+            if (mode === 'standard') {
+                document.body.classList.add('layout-standard');
+                mainTitle.style.textAlign = 'center';
+            } else if (mode === 'inverted') {
+                document.body.classList.add('layout-inverted');
+                mainTitle.style.textAlign = 'center';
+            } else if (mode === 'split') {
+                document.body.classList.add('layout-split');
+            } else if (mode === 'split-rev') {
+                document.body.classList.add('layout-split-rev');
+            }
         }
 
         /* --- WORLD CLOCK LOGIC --- */
@@ -1190,7 +1960,7 @@
             currentPatternType = type;
             document.body.classList.remove('custom-image-mode');
             if (type !== 'none') { sliderZoom.value = 30; sliderPanX.value = 50; sliderPanY.value = 50; }
-            updatePatternStyle(); updateBgParams();     
+            updatePatternStyle(); updateBgParams();      
         }
 
         function updatePatternStyle() {
@@ -1205,7 +1975,7 @@
             let svg = '';
             const t = currentPatternType;
             if(t==='dots') svg=`<circle cx="10" cy="10" r="5" fill="${hex}" opacity="${op}"/>`;
-            else if(t==='stripes') svg=`<path d="M0 20 L20 0 L10 0 L0 10 Z" fill="${hex}" opacity="${op}"/><path d="M10 20 L20 10 L20 20 Z" fill="${hex}" opacity="${op}"/>`;
+            else if(t==='stripes') svg=`<path d="M0 20 L20 0 L10 0 L0 10 Z" fill="${hex}" opacity="${op}"/><path d="M10 20 L20 10 L20 20 Z" fill="white" opacity="0.6"/></svg>`;
             else if(t==='grid') svg=`<path d="M10 0 L10 20 M0 10 L20 10" stroke="${hex}" stroke-width="2" opacity="${op}"/>`;
             else if(t==='check') svg=`<rect x="0" y="0" width="10" height="10" fill="${hex}" opacity="${op}"/><rect x="10" y="10" width="10" height="10" fill="${hex}" opacity="${op}"/>`;
             else if(t==='zig') svg=`<path d="M0 0 L10 10 L20 0 L20 5 L10 15 L0 5 Z" fill="${hex}" opacity="${op}"/>`;
@@ -1370,7 +2140,6 @@
             stopAlarm();
             if (isCuberMode) { 
                 timeLeft = 0; 
-                lastSolveDisplay.style.display = 'none'; 
                 generateScramble(); 
                 timerDisplay.classList.remove('cuber-stopped'); // Reset red color
             }
@@ -1390,7 +2159,7 @@
                 timerDisplay.setAttribute('contenteditable', 'false');
                 showAlert("Cuber Mode:<br>1. Hold screen/space to Arm.<br>2. Release to Solve.");
             } else {
-                scrambleDisplay.style.display = 'none'; lastSolveDisplay.style.display = 'none';
+                scrambleDisplay.style.display = 'none';
                 statsDisplay.style.display = 'none'; // Hide stats
                 timerDisplay.setAttribute('contenteditable', 'true');
                 timeLeft = 300000; originalTime = 300000; updateDisplay();
@@ -1473,6 +2242,9 @@
             const target = e.target;
             const isControl = target.closest('.controls') || target.closest('.settings-panel') || target.closest('.custom-alert-box') || target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA';
             const isEditable = target.id === 'timer' || target.id === 'mainTitle';
+
+            // Allow interaction with widgets without triggering timer
+            if (target.closest('.widget')) return;
 
             if (document.body.classList.contains('fullscreen-mode') && !isControl && !isRunning && !isEditable) document.body.classList.toggle('show-controls');
             if (!isCuberMode || isControl || (isEditable && !isCuberMode)) return;
