@@ -4,6 +4,8 @@
 
 **Tenshon Timer** is a high-performance web workspace designed for speedcubers, students, and content creators. Featuring a unique "detachable window" UI engine and a completely free-form widget system, it adapts to exactly how *you* want to work and play.
 
+**Start your timer now on: https://circlesideiscool.github.io/tenshon-timer/**
+
 ## 🚀 The "Tenshon" Quickstart
 
 1. **Command Center:** Tap the ⚙️ icon in the bottom toolbar to unlock settings.
