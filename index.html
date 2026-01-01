@@ -835,6 +835,13 @@ input[type="color"] { border: none; width: 35px; height: 35px; cursor: pointer; 
                 <div class="toggle-row">
                     <label>🌎 World Clock</label> <input type="checkbox" class="qa-check" value="clock" onchange="updateQuickAccess()">
                 </div>
+                <!-- NEW ITEMS -->
+                <div class="toggle-row">
+                    <label>🐙 GitHub</label> <input type="checkbox" class="qa-check" value="github" checked onchange="updateQuickAccess()">
+                </div>
+                <div class="toggle-row">
+                    <label>☕ Ko-fi</label> <input type="checkbox" class="qa-check" value="kofi" onchange="updateQuickAccess()">
+                </div>
             </div>
         </div>
 
@@ -1219,7 +1226,6 @@ input[type="color"] { border: none; width: 35px; height: 35px; cursor: pointer; 
     let activeWidgetId = null;
     let isDraggingWidget = false, isResizingWidget = false, isRotatingWidget = false;
     let startX, startY, startWidth, startHeight, startRotation, startCenterX, startCenterY;
-    // Add startFontSize variable for text resizing
     let startFontSize = 0, startDist = 0;
     
     // SETTINGS DRAG VARS
@@ -1532,6 +1538,24 @@ input[type="color"] { border: none; width: 35px; height: 35px; cursor: pointer; 
                     btn.title = 'Toggle World Clock';
                     btn.onclick = () => { document.getElementById('clockToggle').click(); };
                     if(clockToggle.checked) btn.style.background = '#f1c40f';
+                } else if(cb.value === 'github') {
+                    btn.innerHTML = '<img src="https://cdn.simpleicons.org/github/white" style="width:16px;height:16px;vertical-align:middle;">';
+                    btn.title = 'Open GitHub';
+                    btn.onclick = () => { window.open('https://github.com/CircleSideisCOOL/tenshon-timer', '_blank'); };
+                    btn.style.background = '#333';
+                    btn.style.color = '#fff';
+                    btn.style.display = 'flex';
+                    btn.style.alignItems = 'center';
+                    btn.style.justifyContent = 'center';
+                } else if(cb.value === 'kofi') {
+                    btn.innerHTML = '<img src="https://cdn.simpleicons.org/kofi/white" style="width:16px;height:16px;vertical-align:middle;">';
+                    btn.title = 'Support on Ko-fi';
+                    btn.onclick = () => { window.open('https://ko-fi.com/circle_side', '_blank'); };
+                    btn.style.background = '#29abe0';
+                    btn.style.color = '#fff';
+                    btn.style.display = 'flex';
+                    btn.style.alignItems = 'center';
+                    btn.style.justifyContent = 'center';
                 }
                 
                 qaContainer.appendChild(btn);
